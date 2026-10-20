@@ -1,7 +1,8 @@
 // Mock-ups of the selected wallpaper for the current recipe and the trial recipe side by side (ticket 06, as the
 // previews of variant D in the prototype): desktop (Bar + control centre) above kitty in each column.
 // While a result is still computing, a column keeps the last palette it had and says "computing…", so moving a
-// control or the strip never shows an empty or grey frame.
+// control or the strip never shows an empty or grey frame. Without the colour lines of the kitty template (missing
+// file, see Settings) the kitty mock-up is off; the desktop mock-up stays.
 pragma ComponentBehavior: Bound
 import QtQuick
 
@@ -9,6 +10,8 @@ Column {
     id: p
     property var app
     spacing: 8
+
+    readonly property bool kittyOff: !p.app.look || Object.keys(p.app.look.kitty).length === 0
 
     Repeater {
         // problems of the helper's system_look(): a template or rule it could not read
@@ -57,7 +60,16 @@ Column {
                     c: col.shown
                     thumb: p.app.it ? p.app.it.thumb : ""
                 }
+                Text {
+                    visible: p.kittyOff
+                    width: col.width
+                    wrapMode: Text.Wrap
+                    text: "kitty mock-up off: no colour lines in the kitty template (see Settings)."
+                    color: p.app.ui.dim
+                    font { family: p.app.ui.font; pixelSize: 12 }
+                }
                 KittyMock {
+                    visible: !p.kittyOff
                     width: col.width; height: Math.round(width * 9 / 16)
                     c: col.shown
                     look: p.app.look

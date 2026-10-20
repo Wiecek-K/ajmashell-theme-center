@@ -5,7 +5,8 @@
 // selected one with its candidates and the full token table in the middle, panel on the right with the controls of the
 // trial recipe (ticket 05), and the desktop and kitty mock-ups of both recipes (ticket 06) between the table and
 // the panel, or under the candidates when the window is too narrow for both. Colours come from helper/tuner.py (real
-// matugen through the dotfiles' palette_recipe.py); this file only holds the state and the protocol.
+// matugen through the Ajmashell palette_recipe.py); this file only holds the state and the protocol. The paths of the
+// helper are set in the Settings panel (ticket 09): a change restarts the helper, the window stays.
 // Start: qs -n -p ~/Projects/ajmashell-theme-center (the .desktop entry does the same).
 import QtQuick
 import Quickshell
@@ -47,6 +48,22 @@ ShellRoot {
         readonly property bool applying: applyStage === "indexer" || applyStage === "wallpaper"
         readonly property bool trialEdited: JSON.stringify(trial) !== JSON.stringify(recipe)
         property string copied: ""
+        // Settings (ticket 09): settings = settings.status() of the paths in use, problems = what each missing path
+        // stops (shown in the panel and, without wallpapers, in the middle); the panel edits draft {key: text}, the
+        // helper checks it ("checked" = status of the draft) and, on apply, saves it and restarts (restarting)
+        property var settings: []
+        property string settingsWarning: ""
+        property var problems: []
+        property bool settingsOpen: false
+        property var draft: ({})
+        property var checked: null
+        property bool restarting: false
+        property string settingsError: ""
+        readonly property bool draftEdited: {
+            for (const s of settings)
+                if ((draft[s.key] ?? s.value) !== s.value) return true;
+            return false;
+        }
 
         readonly property bool trialDiffers: fingerprint !== trialFingerprint
         readonly property int total: items.length
@@ -97,7 +114,7 @@ ShellRoot {
         }
 
         function request() {
-            if (!items.length) return;
+            if (!items.length || !recipe) return;
             const all = order();
             helper.write(JSON.stringify({ type: "compute", recipes: [recipe, trial],
                                           orders: [all, trialAll ? all : all.slice(0, 1)] }) + "\n");
@@ -136,6 +153,37 @@ ShellRoot {
             helper.write(JSON.stringify({ type: "save", recipe: trial }) + "\n");
         }
 
+        // A path typed in the Settings panel: the helper checks the draft after 300 ms without typing.
+        function setDraft(key, text) {
+            const d = Object.assign({}, draft);
+            d[key] = text;
+            draft = d;
+            settingsError = "";
+            checkDebounce.restart();
+        }
+
+        function checkDraft() {
+            if (!restarting) helper.write(JSON.stringify({ type: "check", paths: draft }) + "\n");
+        }
+
+        // The helper saves the settings and starts over in the same process; a new "ready" resets the window.
+        // Not while a save runs: the restart would cut its steps off.
+        function applySettings() {
+            if (restarting || saving || applying || !draftEdited) return;
+            restarting = true;
+            checkDebounce.stop();
+            helper.write(JSON.stringify({ type: "settings", paths: draft }) + "\n");
+        }
+
+        function discardSettings() {
+            const d = {};
+            for (const s of settings) d[s.key] = s.value;
+            draft = d;
+            checked = null;
+            settingsError = "";
+            checkDebounce.stop();
+        }
+
         function restore() {
             trial = JSON.parse(JSON.stringify(recipe));
             trialAll = false;
@@ -145,10 +193,21 @@ ShellRoot {
 
         function onMessage(m) {
             if (m.type === "ready") {
+                // also after a settings change: everything computed so far belonged to the old paths
+                results = {};
+                done = {};
+                rev++;
+                trialAll = false;
+                helperError = "";
+                restarting = false;
+                settings = m.settings;
+                settingsWarning = m.settingsWarning || "";
+                problems = m.problems;
+                discardSettings();
                 recipe = m.recipe;
-                fingerprint = m.fingerprint;
+                fingerprint = m.fingerprint || "";
                 trial = JSON.parse(JSON.stringify(m.recipe));
-                trialFingerprint = m.fingerprint;
+                trialFingerprint = m.fingerprint || "";
                 options = m.options;
                 look = m.look;
                 current = m.current || "";
@@ -181,6 +240,11 @@ ShellRoot {
             } else if (m.type === "apply") {
                 applyStage = m.stage;
                 applyError = m.message || "";
+            } else if (m.type === "checked") {
+                checked = m.settings;
+            } else if (m.type === "settingsSaved") {
+                restarting = false;
+                settingsError = m.error;
             } else if (m.type === "progress") {
                 done[m.fingerprint] = m.done;
                 pending = true;
@@ -217,6 +281,13 @@ ShellRoot {
         onTriggered: app.request()
     }
 
+    Timer {
+        // the Settings panel: one check for the last text typed
+        id: checkDebounce
+        interval: 300
+        onTriggered: app.checkDraft()
+    }
+
     Process {
         id: helper
         command: ["python3", Quickshell.shellDir + "/helper/tuner.py"]
@@ -239,6 +310,7 @@ ShellRoot {
             else if (app.applying) app.applyError = "the helper did not finish";
             if (app.applying) app.applyStage = "error";
             app.saving = false;
+            app.restarting = false;
         }
     }
 
@@ -251,6 +323,7 @@ ShellRoot {
         onVisibleChanged: if (!visible) Qt.quit()
 
         Item {
+            id: keys
             anchors.fill: parent
             focus: true
             // the strip is vertical: ↑ ↓ follow it, ← → do the same
@@ -259,7 +332,8 @@ ShellRoot {
             Keys.onLeftPressed: app.select(app.sel - 1)
             Keys.onRightPressed: app.select(app.sel + 1)
             Keys.onPressed: e => {
-                if (e.key === Qt.Key_Home) app.select(0);
+                if (e.key === Qt.Key_Comma && e.modifiers & Qt.ControlModifier) app.settingsOpen = !app.settingsOpen;
+                else if (e.key === Qt.Key_Home) app.select(0);
                 else if (e.key === Qt.Key_End) app.select(app.items.length - 1);
             }
 
@@ -297,6 +371,14 @@ ShellRoot {
                 contentHeight: besidePreviews.implicitHeight
                 boundsBehavior: Flickable.StopAtBounds
                 Previews { id: besidePreviews; app: app; width: beside.width }
+            }
+
+            SettingsPanel {
+                app: app
+                visible: app.settingsOpen
+                anchors { top: parent.top; bottom: parent.bottom; left: parent.left; right: side.left }
+                // a closed panel gives the keys back to the strip
+                onVisibleChanged: if (!visible) keys.forceActiveFocus()
             }
         }
     }

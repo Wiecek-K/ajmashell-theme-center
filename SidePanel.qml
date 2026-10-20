@@ -1,7 +1,8 @@
 // Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
 // file), "restore current", "save as system recipe" with the steps after it, folder progress for both recipes,
 // the summary of what the trial changes, the last copied hex. Lists and ranges of the controls come from the helper
-// (palette_recipe.options()), never copied here.
+// (palette_recipe.options()), never copied here. On top: the Settings button and what each missing path stops
+// (ticket 09).
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -31,6 +32,27 @@ Rectangle {
             id: col
             width: parent.width
             spacing: 14
+
+            Chip {
+                app: p.app
+                readonly property int missing: p.app.settings.filter(s => !s.found).length
+                label: "Settings" + (missing ? " · " + missing + " missing" : "")
+                tone: p.app.ui.accent
+                selected: p.app.settingsOpen
+                border.color: missing || p.app.settingsWarning ? p.app.ui.error : selected ? tone : p.app.ui.line
+                onClicked: p.app.settingsOpen = !p.app.settingsOpen
+            }
+            Repeater {
+                model: p.app.settingsWarning ? [p.app.settingsWarning, ...p.app.problems] : p.app.problems
+                Text {
+                    required property string modelData
+                    width: col.width
+                    wrapMode: Text.Wrap
+                    text: modelData
+                    color: p.app.ui.error
+                    font { family: p.app.ui.font; pixelSize: 12 }
+                }
+            }
 
             Text { text: "Current recipe"; color: p.app.ui.accent; font { family: p.app.ui.font; pixelSize: 14; bold: true } }
             Text { text: "the system palette recipe file"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
@@ -169,8 +191,16 @@ Rectangle {
 
             Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
 
+            Text {
+                visible: !p.r
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: "Nothing computed: no palette recipe module (see Settings)."
+                color: p.app.ui.error
+                font { family: p.app.ui.font; pixelSize: 13 }
+            }
             Repeater {
-                model: [["current", p.app.fingerprint], ["trial", p.app.trialFingerprint]]
+                model: p.r ? [["current", p.app.fingerprint], ["trial", p.app.trialFingerprint]] : []
                 Text {
                     id: pr
                     required property var modelData

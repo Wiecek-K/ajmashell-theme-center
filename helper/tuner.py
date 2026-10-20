@@ -2,8 +2,9 @@
 # Helper of Ajmashell Theme Center, palette tuning (faza E, ADR 0019): computes, with the real matugen, the palette the
 # system would give each carousel wallpaper for a given palette recipe. Long-lived; talks to the QML window by JSON
 # messages, one per line. The recipe logic (validation, matugen flags, fingerprint) and the colour categories are
-# imported from the dotfiles by path, never copied, so the tool shows exactly what wpapply.sh and the carousel
-# indexer would do.
+# imported from the Ajmashell install by path, never copied, so the tool shows exactly what wpapply.sh and the
+# carousel indexer would do. Every path comes from the settings (settings.py, ticket 09); a missing one is a message
+# in the window, never a crash: without the Ajmashell directory nothing is computed or saved, the rest still starts.
 #
 # Window -> helper (stdin):
 #   {"type": "compute", "recipes": [{...} | null, ...], "orders": [[fileName, ...], ...]}
@@ -16,11 +17,22 @@
 #       write the recipe as the system palette recipe (palette_recipe.save: strict validation, atomic, no commit), then
 #       in the background the carousel indexer and wpapply.sh on the current wallpaper (ticket 07). Saves run one at
 #       a time.
+#   {"type": "check", "paths": {key: text}}   status of paths typed in the Settings panel, nothing saved
+#   {"type": "settings", "paths": {key: text}}
+#       save the settings (settings.save: atomic, an empty path = the default), then the helper restarts itself in the
+#       same process (exec), so the window keeps its pipe and gets a new "ready". The window sends nothing more until
+#       then.
 # Helper -> window (stdout):
-#   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint",
-#    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]},   (palette_recipe.options())
-#    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]}}
+#   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null,
+#    "recipe": {...} | null, "fingerprint": fp | null,   (null: no recipe module, see "problems")
+#    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]} | null,   (palette_recipe.options())
+#    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]},
 #       (system_look(): what the mock-ups read from the system's own files, see there)
+#    "settings": [{key, label, value, default, found, problem}],   (settings.status())
+#    "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
+#    "problems": [text]}   (each missing path with what it stops; shown in the window)
+#   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
+#   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
 #   {"type": "result", "fingerprint", "fileName", "candidates": [hex], "seed": hex, "category", "colors": {token: hex}}
 #   {"type": "error", "fingerprint", "fileName", "message"}
@@ -28,10 +40,11 @@
 #   {"type": "saved", "recipe": {...}, "fingerprint"} | {"type": "saved", "error": text}   (file written or not)
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #
-# Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in ~/.cache/ajmashell-theme-center, so a
-# second start is instant. At most half the cores, like the indexer (the CPU is this machine's bottleneck).
+# Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in $XDG_CACHE_HOME/ajmashell-theme-center
+# (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this machine's bottleneck).
 
 import hashlib
+import importlib
 import json
 import os
 import re
@@ -41,22 +54,17 @@ import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-HOME = os.path.expanduser("~")
-DOTFILES_WALLPAPER = os.path.join(HOME, ".config/quickshell/ajmashell/wallpaper")  # palette_recipe.py, indexer.py
-INDEX = os.path.join(HOME, ".cache/ajmashell/wallpapers/index.json")
-CURRENT = os.path.join(HOME, ".config/hypr/current_wallpaper")
-CACHE = os.path.join(HOME, ".cache/ajmashell-theme-center/results")
-KITTY_TEMPLATE = os.path.join(HOME, ".config/matugen/templates/kitty-colors.conf")
-LOOKNFEEL = os.path.join(HOME, ".config/hypr/configs/looknfeel.lua")
-RULES = os.path.join(HOME, ".config/hypr/configs/rules.lua")
-INDEXER = os.path.join(DOTFILES_WALLPAPER, "indexer.py")
-WPAPPLY = os.path.join(HOME, ".config/hypr/scripts/wpapply.sh")
-WORKERS = max(1, (os.cpu_count() or 2) // 2)
+sys.dont_write_bytecode = True  # no __pycache__ in the Ajmashell install
+import settings  # noqa: E402
 
-sys.dont_write_bytecode = True  # no __pycache__ in the dotfiles
-sys.path.insert(0, DOTFILES_WALLPAPER)
-import indexer  # noqa: E402  (color_bucket: the carousel's own thresholds = the colour category)
-import palette_recipe  # noqa: E402
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
+                     "ajmashell-theme-center", "results")
+WORKERS = max(1, (os.cpu_count() or 2) // 2)
+NO_MODULE = "the Ajmashell directory has no palette recipe module (see Settings)"
+
+PATHS = {}              # settings.load(): key -> path
+palette_recipe = None   # <ajmashellDir>/wallpaper/palette_recipe.py, imported in main()
+indexer = None          # <ajmashellDir>/wallpaper/indexer.py (color_bucket: the carousel's thresholds = colour category)
 
 out_lock = threading.Lock()
 
@@ -79,7 +87,7 @@ def matugen(args):
 def validated(recipe):
     """The recipe as the system would read it: through palette_recipe.load, so validation stays in one place."""
     if recipe is None:
-        return palette_recipe.load()
+        return palette_recipe.load(PATHS["recipeFile"])
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump(recipe, f)
     try:
@@ -94,33 +102,42 @@ def system_look():
     - kitty: every `key {{ colors.TOKEN.default.hex }}` line of the matugen kitty template,
     - border: the tokens and angle of `active_border` in Hyprland's looknfeel.lua,
     - kittyOpacity: the active opacity of the kitty window rule in rules.lua.
-    A file or line that cannot be read lands in `problems` (shown in the window); the mock-up then uses its
-    fallback from Mockups.js. The Ajmashell colours (Bar, popup) are QML bindings and stay mapped in Mockups.js."""
+    A line that cannot be recognised lands in `problems` (shown in the window); the mock-up then uses its fallback
+    from Mockups.js. A missing file is no problem here: settings.status() reports it with what it stops. The Ajmashell colours (Bar, popup) are QML bindings and stay mapped in Mockups.js."""
     look = {"kitty": {}, "border": [], "borderAngle": 0, "kittyOpacity": None, "problems": []}
 
-    def read(path):
+    def read(key):
+        """The file's text, or None when it is missing or unreadable."""
         try:
-            with open(path, encoding="utf-8") as f:
+            with open(PATHS[key], encoding="utf-8") as f:
                 return f.read()
+        except FileNotFoundError:
+            return None
         except OSError as e:
-            look["problems"].append(f"{path}: {e.strerror}")
-            return ""
+            look["problems"].append(f"{PATHS[key]}: {e.strerror}")
+            return None
 
-    for m in re.finditer(r"^\s*(\w+)\s+\{\{\s*colors\.(\w+)\.default\.hex\s*\}\}", read(KITTY_TEMPLATE), re.M):
-        look["kitty"][m.group(1)] = m.group(2)
-    if not look["kitty"]:
-        look["problems"].append(f"{KITTY_TEMPLATE}: no colour lines")
-    m = re.search(r"active_border\s*=\s*\{\s*colors\s*=\s*\{([^}]*)\}\s*,\s*angle\s*=\s*(-?\d+)", read(LOOKNFEEL))
-    if m:
-        look["border"] = re.findall(r"c\.(\w+)", m.group(1))
-        look["borderAngle"] = int(m.group(2))
-    if not look["border"]:
-        look["problems"].append(f"{LOOKNFEEL}: active_border not recognised")
-    m = re.search(r'class\s*=\s*"\^\(kitty\)\$"[^\n]*opacity\s*=\s*"([0-9.]+)', read(RULES))
-    if m:
-        look["kittyOpacity"] = float(m.group(1))
-    else:
-        look["problems"].append(f"{RULES}: kitty window rule (opacity) not recognised")
+    text = read("kittyTemplate")
+    if text is not None:
+        for m in re.finditer(r"^\s*(\w+)\s+\{\{\s*colors\.(\w+)\.default\.hex\s*\}\}", text, re.M):
+            look["kitty"][m.group(1)] = m.group(2)
+        if not look["kitty"]:
+            look["problems"].append(f"{PATHS['kittyTemplate']}: no colour lines")
+    text = read("looknfeel")
+    if text is not None:
+        m = re.search(r"active_border\s*=\s*\{\s*colors\s*=\s*\{([^}]*)\}\s*,\s*angle\s*=\s*(-?\d+)", text)
+        if m:
+            look["border"] = re.findall(r"c\.(\w+)", m.group(1))
+            look["borderAngle"] = int(m.group(2))
+        if not look["border"]:
+            look["problems"].append(f"{PATHS['looknfeel']}: active_border not recognised")
+    text = read("windowRules")
+    if text is not None:
+        m = re.search(r'class\s*=\s*"\^\(kitty\)\$"[^\n]*opacity\s*=\s*"([0-9.]+)', text)
+        if m:
+            look["kittyOpacity"] = float(m.group(1))
+        else:
+            look["problems"].append(f"{PATHS['windowRules']}: kitty window rule (opacity) not recognised")
     return look
 
 
@@ -166,7 +183,7 @@ def store(item, fingerprint, result):
 def load_items():
     """Wallpapers and thumbnails from the carousel index; mtime and size of the file itself for the cache key."""
     try:
-        with open(INDEX) as f:
+        with open(PATHS["wallpaperIndex"]) as f:
             entries = json.load(f).get("items", [])
     except (OSError, ValueError):
         entries = []
@@ -267,34 +284,74 @@ def save(recipe):
     kept) and wpapply.sh on the current wallpaper, so the desktop shows the new colours. wpapply.sh would run the
     indexer itself for a stale entry, but only for the current wallpaper's folder and without a report; here every
     step reports to the window."""
+    if palette_recipe is None:
+        send({"type": "saved", "error": NO_MODULE})
+        return
     try:
-        valid = palette_recipe.save(recipe)
+        valid = palette_recipe.save(recipe, PATHS["recipeFile"])
         fingerprint = palette_recipe.fingerprint(valid)
     except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for "saved" forever)
         send({"type": "saved", "error": str(e) or type(e).__name__})
         return
     send({"type": "saved", "recipe": valid, "fingerprint": fingerprint})
     send({"type": "apply", "stage": "indexer"})
-    err = run_step(["python3", INDEXER])
+    err = run_step(["python3", os.path.join(PATHS["ajmashellDir"], "wallpaper", "indexer.py")])
     if err is None:
-        current = os.path.realpath(CURRENT) if os.path.exists(CURRENT) else None
+        current = current_wallpaper()
         if current is None:
-            err = f"{CURRENT}: no current wallpaper"
+            err = f"{PATHS['currentWallpaper']}: no current wallpaper"
         else:
             send({"type": "apply", "stage": "wallpaper"})
-            err = run_step([WPAPPLY, current])
+            err = run_step([PATHS["wpapply"], current])
     send({"type": "apply", "stage": "error", "message": err} if err else {"type": "apply", "stage": "done"})
 
 
+def current_wallpaper():
+    link = PATHS["currentWallpaper"]
+    return os.path.realpath(link) if os.path.exists(link) else None
+
+
+def load_modules():
+    """Import palette_recipe and indexer from the Ajmashell directory of the settings; None and the reason if not."""
+    global palette_recipe, indexer
+    folder = os.path.join(PATHS["ajmashellDir"], "wallpaper")
+    if not all(os.path.isfile(os.path.join(folder, n)) for n in settings.RECIPE_MODULES):
+        return None  # settings.status() already says what is missing
+    sys.path.insert(0, folder)
+    try:
+        palette_recipe = importlib.import_module("palette_recipe")
+        indexer = importlib.import_module("indexer")
+    except Exception as e:  # noqa: BLE001  (a broken module of another version must not stop the window)
+        palette_recipe = indexer = None
+        return f"{folder}: the palette recipe module cannot be loaded ({type(e).__name__}: {e}); nothing is computed"
+    return None
+
+
+def restart():
+    """New settings: the same process starts over (exec keeps the window's pipes), so every path and the recipe
+    module are read again. Running matugen calls finish on their own; their results are dropped."""
+    sys.stdout.flush()
+    os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])
+
+
 def main():
+    global PATHS
+    PATHS, warning = settings.load()
+    status = settings.status(PATHS)
+    problems = [s["problem"] for s in status if s["problem"]]
+    module_error = load_modules()
+    if module_error:
+        problems.append(module_error)
     os.makedirs(CACHE, exist_ok=True)
     items = load_items()
-    current = os.path.realpath(CURRENT) if os.path.exists(CURRENT) else None
-    recipe = palette_recipe.load()
+    current = current_wallpaper()
+    recipe = palette_recipe.load(PATHS["recipeFile"]) if palette_recipe else None
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
-          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe), "options": palette_recipe.options(), "look": system_look()})
+          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe) if recipe else None,
+          "options": palette_recipe.options() if palette_recipe else None, "look": system_look(),
+          "settings": status, "settingsWarning": warning, "problems": problems})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
@@ -305,12 +362,24 @@ def main():
             msg = json.loads(line)
         except ValueError:
             continue
-        if msg.get("type") == "compute":
+        if msg.get("type") == "compute" and palette_recipe:
             recipes = msg.get("recipes") or [None]
             orders = msg.get("orders") or []
             queue.request([validated(r) for r in recipes], [*orders, *[[]] * (len(recipes) - len(orders))])
         elif msg.get("type") == "save":
             saver.submit(save, msg.get("recipe"))
+        elif msg.get("type") == "check":
+            try:
+                send({"type": "checked", "settings": settings.status(settings.resolve(msg.get("paths") or {}))})
+            except ValueError:
+                pass  # the window only sends the keys it got in "ready"
+        elif msg.get("type") == "settings":
+            try:
+                settings.save(msg.get("paths") or {})
+            except (ValueError, OSError) as e:
+                send({"type": "settingsSaved", "error": str(e)})
+            else:
+                restart()
     os._exit(0)  # window closed: drop the queue, do not wait for running matugen calls
 
 

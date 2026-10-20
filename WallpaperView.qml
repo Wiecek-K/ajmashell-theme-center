@@ -27,6 +27,16 @@ Flickable {
         width: v.width
         spacing: 14
 
+        Text {
+            // no wallpapers (index missing or empty): why, from the helper's problems (ticket 09)
+            visible: !v.it && v.app.settings.length > 0
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "No wallpapers to show." + (v.app.problems.length ? "\n\n" + v.app.problems.join("\n\n") : "")
+            color: v.app.ui.text
+            font { family: v.app.ui.font; pixelSize: 14 }
+        }
+
         Flow {
             width: parent.width
             spacing: 16
