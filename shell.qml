@@ -230,7 +230,14 @@ ShellRoot {
             }
         }
         stderr: SplitParser { onRead: data => console.warn("tuner.py:", data) }
-        onExited: code => app.helperError = "Pomocnik zakończył pracę (kod " + code + "), liczenie stoi. Szczegóły: journal / terminal."
+        onExited: code => {
+            app.helperError = "Pomocnik zakończył pracę (kod " + code + "), liczenie stoi. Szczegóły: journal / terminal.";
+            // a save in flight gets no answer any more: say so instead of "zapisuję…" for good
+            if (app.saving) app.saveError = "pomocnik nie odpowiedział; sprawdź plik Przepisu";
+            else if (app.applying) app.applyError = "pomocnik nie dokończył";
+            if (app.applying) app.applyStage = "error";
+            app.saving = false;
+        }
     }
 
     FloatingWindow {

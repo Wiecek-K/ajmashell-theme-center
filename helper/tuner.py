@@ -265,10 +265,11 @@ def save(recipe):
     entry, but only for the current wallpaper's folder and without a report; here every step reports to the window."""
     try:
         valid = palette_recipe.save(recipe)
-    except (ValueError, OSError) as e:
-        send({"type": "saved", "error": str(e)})
+        fingerprint = palette_recipe.fingerprint(valid)
+    except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for "saved" forever)
+        send({"type": "saved", "error": str(e) or type(e).__name__})
         return
-    send({"type": "saved", "recipe": valid, "fingerprint": palette_recipe.fingerprint(valid)})
+    send({"type": "saved", "recipe": valid, "fingerprint": fingerprint})
     send({"type": "apply", "stage": "indexer"})
     err = run_step(["python3", INDEXER])
     if err is None:
