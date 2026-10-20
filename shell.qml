@@ -1,7 +1,8 @@
 //@ pragma AppId matugen-ajmashell-tool
 // Palette tuning tool (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the system gives it.
-// Layout = variant D of the prototype (branch prototype/faza-e-karta-ui): one wallpaper at a time, a strip of all
-// wallpapers at the bottom, the full token table next to the preview. Colours come from helper/tuner.py (real
+// Layout = variant D of the prototype (branch prototype/faza-e-karta-ui): strip of all wallpapers on the left, the
+// selected one with its Kandydaci and the full token table in the middle, panel on the right (controls from ticket
+// 05; mock-ups between the table and the panel come in ticket 06). Colours come from helper/tuner.py (real
 // matugen through the dotfiles' palette_recipe.py); this file only holds the state and the protocol.
 // Start: qs -n -p ~/Projects/matugen-ajmashell-tool (the .desktop entry does the same).
 import QtQuick
@@ -119,6 +120,9 @@ ShellRoot {
         Item {
             anchors.fill: parent
             focus: true
+            // the strip is vertical: ↑ ↓ follow it, ← → do the same
+            Keys.onUpPressed: app.select(app.sel - 1)
+            Keys.onDownPressed: app.select(app.sel + 1)
             Keys.onLeftPressed: app.select(app.sel - 1)
             Keys.onRightPressed: app.select(app.sel + 1)
             Keys.onPressed: e => {
@@ -126,22 +130,23 @@ ShellRoot {
                 else if (e.key === Qt.Key_End) app.select(app.items.length - 1);
             }
 
-            Header {
-                id: header
+            Strip {
+                id: strip
                 app: app
-                anchors { top: parent.top; left: parent.left; right: parent.right }
+                width: 200
+                anchors { top: parent.top; bottom: parent.bottom; left: parent.left; margins: 8 }
+            }
+
+            SidePanel {
+                id: side
+                app: app
+                width: 300
+                anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
             }
 
             WallpaperView {
                 app: app
-                anchors { top: header.bottom; bottom: strip.top; left: parent.left; right: parent.right }
-            }
-
-            Strip {
-                id: strip
-                app: app
-                height: 150
-                anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+                anchors { top: parent.top; bottom: parent.bottom; left: strip.right; right: side.left; margins: 16 }
             }
         }
     }

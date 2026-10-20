@@ -9,14 +9,14 @@ Pokazuje dla każdej tapety karuzeli paletę, którą da system według Przepisu
 - Launcher: „Strojenie palety matugena” (`~/.local/share/applications/matugen-ajmashell-tool.desktop`,
   kopia w repo: `matugen-ajmashell-tool.desktop`; po zmianie: `install -Dm644 matugen-ajmashell-tool.desktop ~/.local/share/applications/`).
 - Ręcznie: `qs -n -p ~/Projects/matugen-ajmashell-tool` (`-n`: drugie uruchomienie nie otwiera drugiego okna).
-- Klawisze: `←` `→` zmieniają tapetę, `Home` / `End` pierwsza / ostatnia. Klik w próbkę kopiuje hex.
+- Klawisze: `↑` `↓` (i `←` `→`) zmieniają tapetę, `Home` / `End` pierwsza / ostatnia. Klik w próbkę kopiuje hex.
 
 ## Budowa
 
 | Plik | Rola |
 |---|---|
 | `shell.qml` | stan okna i protokół z pomocnikiem; `//@ pragma AppId` daje klasę okna `matugen-ajmashell-tool` |
-| `Header.qml`, `WallpaperView.qml`, `TokenTable.qml`, `Strip.qml` | układ wariantu D z prototypu (gałąź `prototype/faza-e-karta-ui`) |
+| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` | układ wariantu D z prototypu (gałąź `prototype/faza-e-karta-ui`): taśma z lewej, podgląd z Kandydatami i tabela w środku, panel z prawej |
 | `helper/tuner.py` | pomocnik: prawdziwy matugen, moduł Przepisu i kategorie z dotfiles (import po ścieżce, bez kopii) |
 
 Protokół (JSON, jeden komunikat w linii) opisany w nagłówku `helper/tuner.py`.

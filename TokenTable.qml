@@ -1,18 +1,17 @@
-// Full token table of the dark palette (all tokens matugen gives, as in ~/.local/state/ajmashell/colors.json):
-// swatch with hex, token name. A click on a swatch copies the hex. columnHeight > 0: groups fill columns top to
-// bottom (wide window); 0: groups wrap in rows (half-screen tile).
+// Full token table of the dark palette (all tokens matugen gives, as in ~/.local/state/ajmashell/colors.json),
+// as in variant D of the prototype: groups in two columns when there is room, row = token name + swatch with hex.
+// A click on a swatch copies the hex.
 import QtQuick
 
-Flow {
+Grid {
     id: t
     property var app
     property var res
-    property real columnHeight: 0
     readonly property var colors: res && res.colors ? res.colors : null
 
-    flow: columnHeight > 0 ? Flow.TopToBottom : Flow.LeftToRight
-    height: columnHeight > 0 ? columnHeight : implicitHeight
-    spacing: 18
+    columns: width > 980 ? 2 : 1
+    columnSpacing: 28
+    rowSpacing: 14
 
     // Groups by role; a token matugen adds later lands in "Inne".
     readonly property var groups: {
@@ -45,6 +44,11 @@ Flow {
             required property var modelData
             spacing: 3
             Text { text: grp.modelData.name; color: t.app.ui.accent; font { family: t.app.ui.font; pixelSize: 12; bold: true } }
+            Row {
+                spacing: 8
+                Text { width: 230; text: "token"; color: t.app.ui.dim; font { family: t.app.ui.font; pixelSize: 10 } }
+                Text { width: 110; text: "obecny"; color: t.app.ui.dim; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
+            }
             Repeater {
                 model: grp.modelData.tokens
                 Row {
@@ -52,19 +56,13 @@ Flow {
                     required property string modelData
                     readonly property string hex: t.colors[modelData] || ""
                     spacing: 8
+                    Text { width: 230; text: row.modelData; color: t.app.ui.text; font { family: "monospace"; pixelSize: 12 } }
                     Rectangle {
-                        width: 96; height: 22; radius: 4
+                        width: 110; height: 20; radius: 4
                         color: row.hex || "transparent"
                         border.color: t.app.ui.line
                         Text { anchors.centerIn: parent; text: row.hex || "—"; color: t.app.contrastText(row.hex); font { family: "monospace"; pixelSize: 11 } }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: row.hex !== ""; onClicked: t.app.copy(row.hex) }
-                    }
-                    Text {
-                        width: 230
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: row.modelData
-                        color: t.app.ui.text
-                        font { family: "monospace"; pixelSize: 12 }
                     }
                 }
             }
