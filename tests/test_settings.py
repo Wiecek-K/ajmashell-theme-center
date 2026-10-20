@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tests of helper/settings.py: the paths the tool needs, read from settings.json (defaults, own values, a missing
 # or broken file) and whether each one is found.
 import json

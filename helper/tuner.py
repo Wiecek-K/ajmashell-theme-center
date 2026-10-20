@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Helper of Ajmashell Theme Center, palette tuning (faza E, ADR 0019): computes, with the real matugen, the palette the
 # system would give each carousel wallpaper for a given palette recipe. Long-lived; talks to the QML window by JSON
 # messages, one per line. The recipe logic (validation, matugen flags, fingerprint) and the colour categories are
@@ -33,7 +34,8 @@
 #    "settings": [{key, label, value, own, default, found, problem}],   (settings.status())
 #    "recipeFile": path | null,   (palette_recipe.DEFAULT_PATH of the module in use; null without the module)
 #    "settingsFile": path, "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
-#    "problems": [text]}   (each missing path with what it stops; shown in the window)
+#    "problems": [text],   (each missing path with what it stops; shown in the window)
+#    "matugenWarning": text | null}   (matugen missing or not 4.2.x: shown in the window, nothing blocked)
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
 #   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
@@ -64,6 +66,8 @@ import settings  # noqa: E402
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
                      "ajmashell-theme-center", "results")
 WORKERS = max(1, (os.cpu_count() or 2) // 2)
+TESTED_MATUGEN = "4.2.0"  # any 4.2.x is fine; another version gives a warning in the window
+TESTED_NOTE = f"tested with matugen {TESTED_MATUGEN}, results may differ"
 NO_MODULE = "the Ajmashell directory has no palette recipe module (see Settings)"
 
 PATHS = {}              # settings.load(): key -> path
@@ -311,6 +315,22 @@ def save(recipe):
     send({"type": "apply", "stage": "error", "message": err} if err else {"type": "apply", "stage": "done"})
 
 
+def matugen_warning():
+    """None for matugen 4.2.x, else the text for the window (ticket 11). Other versions may build other palettes from
+    the same flags; the tool still runs (no block), and without matugen only the computing stops."""
+    try:
+        r = subprocess.run(["matugen", "--version"], capture_output=True, text=True, timeout=10)
+    except FileNotFoundError:
+        return f"matugen not found: install matugen {TESTED_MATUGEN} (pacman -S matugen); no palette can be computed"
+    except (OSError, subprocess.SubprocessError) as e:
+        return f"matugen --version failed ({e}); {TESTED_NOTE}"
+    found = re.search(r"\b(\d+)\.(\d+)\.\d+\b", r.stdout)
+    if found and found.group(1, 2) == tuple(TESTED_MATUGEN.split(".")[:2]):
+        return None
+    version = f"matugen {found.group(0)}" if found else f"matugen of unknown version ({r.stdout.strip()!r})"
+    return f"{version}: {TESTED_NOTE}"
+
+
 def current_wallpaper():
     link = PATHS["currentWallpaper"]
     return os.path.realpath(link) if os.path.exists(link) else None
@@ -361,7 +381,7 @@ def main():
           "options": palette_recipe.options() if palette_recipe else None, "look": system_look(),
           "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
           "recipeFile": palette_recipe.DEFAULT_PATH if palette_recipe else None,
-          "problems": problems})
+          "problems": problems, "matugenWarning": matugen_warning()})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):

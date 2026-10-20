@@ -1,9 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 [Desktop Entry]
 Type=Application
 Name=Ajmashell Theme Center
 GenericName=Palette tuning
 Comment=The matugen palette of every carousel wallpaper for a palette recipe
-Exec=qs -n -p /home/ajmag/Projects/ajmashell-theme-center
+Exec=qs -n -c ajmashell-theme-center
 Icon=preferences-color
 Terminal=false
 Categories=Graphics;

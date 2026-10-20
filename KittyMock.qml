@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // kitty mock-up for one palette: a focused kitty window on the wallpaper. Colours by kitty key from the matugen
 // template kitty-colors.conf (map from the helper, Mockups.kitty()), the border as Hyprland's active_border
 // (tokens and angle from looknfeel.lua), the whole window at the opacity of the kitty window rule (rules.lua),

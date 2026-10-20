@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Settings of Ajmashell Theme Center (faza E ticket 09): every path the tool needs from the Ajmashell install and the
 # system, with its default in one place (DEFAULTS, the paths of the dotfiles), so a user with Ajmashell elsewhere only
 # sets their own. The palette recipe file is no setting: its path is the recipe module's own

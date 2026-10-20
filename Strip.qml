@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Strip of all carousel wallpapers on the left (thumbnails from the carousel cache), as in variant D of the
 // prototype. Arrows move the selection (shell.qml); a click selects. Marks: selection frame, "on desktop" = the
 // system's current wallpaper, seed dot (a second one when the trial picks another seed), error badge, and what the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
 // file), "restore current", "save as system recipe" with the steps after it, folder progress for both recipes,
 // the summary of what the trial changes, the last copied hex. Lists and ranges of the controls come from the helper
@@ -52,6 +53,14 @@ Rectangle {
                     color: p.app.ui.error
                     font { family: p.app.ui.font; pixelSize: 12 }
                 }
+            }
+            Text {
+                visible: p.app.matugenWarning !== ""
+                width: col.width
+                wrapMode: Text.Wrap
+                text: p.app.matugenWarning
+                color: p.app.ui.warn
+                font { family: p.app.ui.font; pixelSize: 12 }
             }
 
             Text { text: "Current recipe"; color: p.app.ui.accent; font { family: p.app.ui.font; pixelSize: 14; bold: true } }

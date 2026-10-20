@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Tests of the helper's protocol (helper/tuner.py, JSON lines on stdin/stdout), run as the window runs it.
 # Everything lives in a temporary directory: settings, cache, palette recipe file, wallpaper index and stand-in
 # Ajmashell directories, each with a copy of the real palette_recipe.py (the recipe logic is Ajmashell's, never copied
@@ -45,6 +46,9 @@ class Helper(unittest.TestCase):
                          "looknfeel": self.path("looknfeel.lua"), "windowRules": self.path("rules.lua"),
                          "wpapply": self.path("wpapply.sh")}
         self.proc = None
+        self.bin = self.path("bin")  # stand-in programs, first on PATH
+        os.makedirs(self.bin)
+        self.only_bin = False  # PATH = only self.bin (a program missing from the system)
 
     def tearDown(self):
         if self.proc:
@@ -79,7 +83,8 @@ class Helper(unittest.TestCase):
 
     def start(self):
         self.write(self.path("config/ajmashell-theme-center/settings.json"), self.settings)
-        env = dict(os.environ, XDG_CONFIG_HOME=self.path("config"), XDG_CACHE_HOME=self.path("cache"))
+        env = dict(os.environ, XDG_CONFIG_HOME=self.path("config"), XDG_CACHE_HOME=self.path("cache"),
+                   PATH=self.bin if self.only_bin else self.bin + os.pathsep + os.environ.get("PATH", ""))
         self.proc = subprocess.Popen([sys.executable, HELPER], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.DEVNULL, text=True, env=env)
         self.lines = queue.Queue()
@@ -92,6 +97,13 @@ class Helper(unittest.TestCase):
             self.proc.kill()
             self.fail("the helper does not read settings.json; no message sent")
         return ready
+
+    def stub_matugen(self, version_line):
+        """A matugen on PATH that only answers --version."""
+        stub = os.path.join(self.bin, "matugen")
+        with open(stub, "w") as f:
+            f.write(f"#!/bin/sh\necho '{version_line}'\n")
+        os.chmod(stub, 0o755)
 
     def send(self, msg):
         self.proc.stdin.write(json.dumps(msg) + "\n")
@@ -153,6 +165,26 @@ class Helper(unittest.TestCase):
         self.send({"type": "compute", "recipes": [None, None], "orders": [[], []]})
         self.send({"type": "save", "recipe": VIBRANT})
         self.assertIn("Ajmashell directory", self.expect("saved")["error"])
+
+    def test_matugen_other_than_4_2_is_a_warning(self):
+        self.stub_matugen("matugen 4.3.0")
+        warning = self.start()["matugenWarning"]
+        self.assertIn("matugen 4.3.0", warning)
+        self.assertIn("tested with matugen 4.2.0, results may differ", warning)
+
+    def test_matugen_4_2_gives_no_warning(self):
+        self.stub_matugen("matugen 4.2.7")
+        self.assertIsNone(self.start()["matugenWarning"])
+
+    def test_unrecognised_matugen_version_is_a_warning(self):
+        self.stub_matugen("something else")
+        self.assertIn("tested with matugen 4.2.0", self.start()["matugenWarning"])
+
+    def test_missing_matugen_is_a_warning_not_a_crash(self):
+        self.only_bin = True
+        ready = self.start()
+        self.assertIn("matugen not found", ready["matugenWarning"])
+        self.assertEqual(ready["recipe"], VIBRANT)  # the rest still starts
 
     def test_broken_settings_file_gives_defaults_and_a_warning(self):
         self.start()

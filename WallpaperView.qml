@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The selected wallpaper, as in variant D of the prototype: preview with the candidates next to it (seed of each
 // recipe marked), the colour category of the carousel for both, the mock-ups when the window is narrow (shell.qml),
 // and the full token table below.

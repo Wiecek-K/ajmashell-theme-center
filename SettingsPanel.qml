@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Settings panel (ticket 09): every path the helper needs, with its field, its default and "found" / "missing".
 // The fields edit app.draft; the helper checks the draft while typing (the markers follow it) and, on "apply",
 // saves settings.json and restarts itself, so the new paths work without restarting the window. An empty field

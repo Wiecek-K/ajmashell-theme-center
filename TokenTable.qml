@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Full token table of the dark palette (all tokens matugen gives, as in ~/.local/state/ajmashell/colors.json),
 // as in variant D of the prototype: groups in two columns when there is room, row = token name + swatch with hex for
 // the current recipe and the trial recipe; "≠" and the trial colour mark a token the trial changes.

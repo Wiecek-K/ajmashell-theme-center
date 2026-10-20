@@ -1,15 +1,61 @@
 # Ajmashell Theme Center
 
-A Quickshell window for tuning the colours of Ajmashell. For every wallpaper of the Ajmashell carousel it shows the
-palette the system gives it under the palette recipe, and lets you try another recipe before you save it as the
-system one.
+A Quickshell window for tuning the colours of [Ajmashell](https://github.com/Wiecek-K/arch-hyprland-ajmag). For every
+wallpaper of the Ajmashell carousel it shows the palette the system gives it under the palette recipe, and lets you
+try another recipe before you save it as the system one.
+
+![Ajmashell Theme Center: wallpapers on the left, candidates, mock-ups and tokens of the current and the trial recipe in the middle, the controls on the right](docs/screenshot.jpg)
 
 It needs Ajmashell: it reads the carousel index, imports the palette recipe module from the Ajmashell install and runs
 its scripts after a save. There is no stand-alone mode.
 
-Status: phase E of the Hyprland migration project (`~/Projects/hyprland-lua-migration`, ADR 0019, spec
-`.scratch/faza-e/spec.md`). A local git repository without a remote for now; publishing and installing come with
-ticket 11.
+## Requirements
+
+| What | Why | Arch Linux |
+|---|---|---|
+| Ajmashell (the `.config/quickshell/ajmashell` directory of the [dotfiles](https://github.com/Wiecek-K/arch-hyprland-ajmag)), on Hyprland | the palette recipe module, the wallpaper carousel and its index, the scripts that apply a palette | see its README |
+| Quickshell (`qs`) | runs the window | `pacman -S quickshell` |
+| matugen 4.2.0 | computes the candidates, the seed and the palette | `pacman -S matugen` |
+| Python 3 | the helper behind the window | `pacman -S python` |
+
+Another matugen version works, but may give other palettes from the same recipe: the window shows a warning
+("tested with matugen 4.2.0, results may differ").
+
+## Install
+
+```sh
+git clone https://github.com/Wiecek-K/ajmashell-theme-center.git ~/Projects/ajmashell-theme-center
+cd ~/Projects/ajmashell-theme-center
+./install.sh
+```
+
+`install.sh` changes nothing outside your home directory and never uses `sudo`. It:
+
+1. checks `qs`, `matugen`, `python3` and the Ajmashell directory (the one from the settings, by default
+   `~/.config/quickshell/ajmashell`). Each missing one prints a line with how to install it, for example
+   `matugen not found: install matugen 4.2.0 (pacman -S matugen)`, and the script stops with exit code 1 before it
+   installs anything,
+2. links the clone as the Quickshell config `~/.config/quickshell/ajmashell-theme-center`,
+3. installs the launcher entry `~/.local/share/applications/ajmashell-theme-center.desktop`.
+
+The clone stays where you cloned it: the link points to it, so `git pull` updates the tool. After moving the clone,
+run `./install.sh` again. `./install.sh --uninstall` removes the link and the launcher entry; the clone, the settings
+and the cache stay.
+
+The window rule that makes the window opaque (`theme-center-opaque`, class `ajmashell-theme-center`) comes with the
+Ajmashell dotfiles (`~/.config/hypr/configs/rules.lua`); without it the window is as transparent as other windows.
+
+## First start
+
+Start "Ajmashell Theme Center" from the launcher, or `qs -n -c ajmashell-theme-center` (`-n`: a second start does not
+open a second window).
+
+The first start computes every wallpaper of the carousel with matugen, the selected one first, at most on half the
+CPU cores. The results are cached, so later starts are instant. With no wallpapers in the window, open the Ajmashell
+wallpaper carousel (Super + W) once: it builds the index the tool reads.
+
+If something is missing (another Ajmashell directory, a Hyprland file elsewhere), a red line at the top of the right
+panel names it and what it stops; open Settings (see below).
 
 ## Terms
 
@@ -22,11 +68,8 @@ ticket 11.
 | seed | the candidate the recipe picks; matugen builds the whole palette from it |
 | colour category | the carousel's colour filter for a wallpaper (from the indexer), taken from the palette's `primary` |
 
-## Running it
+## Using it
 
-- Launcher: "Ajmashell Theme Center" (`~/.local/share/applications/ajmashell-theme-center.desktop`, copy in this repo:
-  `ajmashell-theme-center.desktop`; after a change: `install -Dm644 ajmashell-theme-center.desktop ~/.local/share/applications/`).
-- By hand: `qs -n -p ~/Projects/ajmashell-theme-center` (`-n`: a second start does not open a second window).
 - Keys: `↑` `↓` (and `←` `→`) change the wallpaper, `Home` / `End` the first / last one, `Ctrl+,` opens or closes
   Settings. A click on a swatch copies its hex.
 - The controls (panel on the right) change the trial recipe: seed choice, scheme, contrast, dark palette lightness.
@@ -35,30 +78,21 @@ ticket 11.
   computed for the selected wallpaper only (and for each one you select later); "compute all wallpapers" computes the
   rest of the folder. "restore current" goes back to the system palette recipe file. Strip: "seed" / "palette" = what
   the trial changes on that wallpaper; the second dot is the trial seed.
-- "save as system recipe" writes the trial through `palette_recipe.save()` (atomic, no commit), then runs `indexer.py`
-  and `wpapply.sh` on the current wallpaper in the background; the steps show under the button. The saved recipe
-  becomes the current one.
+- For each recipe the middle shows a desktop mock-up (Bar and control centre) and a kitty mock-up, side by side, and
+  the table of all palette tokens.
 - "Settings" (top of the right panel) lists every path the tool reads, see "Settings" below.
 
-## Layout
+## Saving: what changes in your system
 
-| File | Role |
-|---|---|
-| `shell.qml` | window state and the protocol with the helper; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
-| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | layout of variant D of the prototype (branch `prototype/faza-e-karta-ui`): strip on the left, preview with the candidates and the token table in the middle, panel on the right |
-| `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
-| `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml` in the look `fancy2`; kitty and the border from the system's files, see below) |
-| `SettingsPanel.qml` | the Settings panel: a field per path, its default, "found" / "missing" |
-| `helper/tuner.py` | the helper: real matugen, the recipe module and the colour categories from the Ajmashell install (imported by path, not copied) |
-| `helper/settings.py` | the paths: defaults (the one place they are written), `settings.json`, found / missing |
-| `tests/` | helper tests, `tests/run.sh` |
+"save as system recipe" writes the trial recipe into the palette recipe file of Ajmashell,
+`~/.config/matugen/palette-recipe.json` (through `palette_recipe.save()`: validated, atomic). Then, in the background,
+it runs the carousel indexer (new seeds and colour categories, the thumbnails stay) and `wpapply.sh` on the wallpaper
+on your desktop, so the desktop takes the new colours at once. The steps show under the button. The saved recipe
+becomes the current one; every later wallpaper change uses it too.
 
-The protocol (JSON, one message per line) is described in the header of `helper/tuner.py`.
-Result cache: `~/.cache/ajmashell-theme-center/results` (`$XDG_CACHE_HOME` if set) (key: wallpaper path, mtime, size, recipe fingerprint); safe to
-delete at any time. Delete it after a matugen update (the fingerprint does not cover the matugen version).
-
-The texts of the desktop mock-up (control centre, volume, …) copy the real Ajmashell, whose interface is Polish, so
-they stay Polish. Everything else in the window is English.
+Nothing is committed. If your Ajmashell lives in a dotfiles git repository, `palette-recipe.json` shows there as a
+changed file: commit it yourself when you like the result, or `git checkout` it (then apply a wallpaper again) to go
+back.
 
 ## Settings: the paths it needs
 
@@ -87,12 +121,35 @@ The palette recipe file is no setting: the tool reads and saves the file the rec
 (`DEFAULT_PATH` in `palette_recipe.py`, today `~/.config/matugen/palette-recipe.json`), the same file `indexer.py` and
 `wpapply.sh` read. Without it the window says so and shows the recipe's starting values; a save creates it.
 
-The window rule `theme-center-opaque` (class `ajmashell-theme-center`, `opacity 1.0 override`) lives in the dotfiles
-(`~/.config/hypr/configs/rules.lua`); without it the window is as transparent as other windows.
+`install.sh` reads the Ajmashell directory from the same settings file, so with Ajmashell elsewhere, write it there
+first: `{"ajmashellDir": "/path/to/ajmashell"}` in `~/.config/ajmashell-theme-center/settings.json`.
 
 The palette is computed as in the system: the seed from the thumbnail with the recipe's flags (as the indexer), the
-palette from the seed through `matugen color hex` with the palette flags (as `wpapply.sh`), dark mode. For the current
-wallpaper the result equals `~/.local/state/ajmashell/colors.json` (checked 2026-10-20, 50 tokens).
+palette from the seed through `matugen color hex` with the palette flags (as `wpapply.sh`), dark mode. For the wallpaper
+on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.json` (checked 2026-10-20, 50 tokens).
+
+## Layout
+
+| File | Role |
+|---|---|
+| `shell.qml` | window state and the protocol with the helper; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
+| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
+| `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
+| `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml` in the look `fancy2`; kitty and the border from the system's files) |
+| `SettingsPanel.qml` | the Settings panel: a field per path, its default, "found" / "missing" |
+| `helper/tuner.py` | the helper: real matugen, the recipe module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
+| `helper/settings.py` | the paths: defaults (the one place they are written), `settings.json`, found / missing |
+| `install.sh` | install and uninstall, see above |
+| `ajmashell-theme-center.desktop` | the launcher entry `install.sh` installs |
+| `tests/` | helper tests, `tests/run.sh` |
+
+The protocol (JSON, one message per line) is described in the header of `helper/tuner.py`.
+Result cache: `~/.cache/ajmashell-theme-center/results` (`$XDG_CACHE_HOME` if set) (key: wallpaper path, mtime, size,
+recipe fingerprint); safe to delete at any time. Delete it after a matugen update (the fingerprint does not cover the
+matugen version).
+
+The texts of the desktop mock-up (control centre, volume, …) copy the real Ajmashell, whose interface is Polish, so
+they stay Polish. Everything else in the window is English.
 
 ## Tests
 
@@ -100,11 +157,16 @@ wallpaper the result equals `~/.local/state/ajmashell/colors.json` (checked 2026
 
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
 - `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
-  recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the helper
-  restarts in the same process), missing paths as messages, a save with its steps. Everything runs in a temporary
-  directory with a copy of the real `palette_recipe.py` (from `$AJMASHELL_DIR` or `~/.config/quickshell/ajmashell`;
-  the tests skip without it) and stand-ins for `indexer.py` and `wpapply.sh`; matugen is not called. A helper that
-  does not report its settings stops the test before any message, so a test never saves into the real recipe file.
+  recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the
+  helper restarts in the same process), missing paths as messages, a save with its steps, the matugen version warning.
+  Everything runs in a temporary directory with a copy of the real `palette_recipe.py` (from `$AJMASHELL_DIR` or
+  `~/.config/quickshell/ajmashell`; the tests skip without it), stand-ins for `indexer.py` and `wpapply.sh`, and a
+  stand-in `matugen` that only answers `--version`; no palette is computed. A helper that does not report its
+  settings stops the test before any message, so a test never saves into the real recipe file.
 
-The QML window has no automated tests: checked by hand, with screenshots of the window in full screen and tiled on
-half the screen, the window found by PID (rule from the migration project's `CLAUDE.md`).
+The QML window and `install.sh` have no automated tests: checked by hand, the window with screenshots in full screen
+and tiled on half the screen.
+
+## License
+
+AGPL-3.0-or-later, see [`LICENSE`](LICENSE). Sources and the projects the tool uses at run time: [`SOURCES.md`](SOURCES.md).

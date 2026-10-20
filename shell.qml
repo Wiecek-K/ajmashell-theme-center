@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //@ pragma AppId ajmashell-theme-center
 // Ajmashell Theme Center, palette tuning (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the
 // system gives it.
@@ -55,6 +56,7 @@ ShellRoot {
         property string settingsFile: ""
         property string recipeFile: ""  // named by the recipe module, not a setting (user, 2026-10-21)
         property string settingsWarning: ""
+        property string matugenWarning: ""   // matugen missing or not 4.2.x (ticket 11): a warning, nothing blocked
         property var problems: []
         property bool settingsOpen: false
         property var draft: ({})
@@ -86,7 +88,7 @@ ShellRoot {
         }
 
         readonly property var ui: ({ bg: "#141416", panel: "#1d1d21", line: "#2e2e34", text: "#e6e6ea", dim: "#9a9aa4",
-                                     accent: "#8ab4f8", trial: "#ffb74d", error: "#ff8a80", font: "Inter" })
+                                     accent: "#8ab4f8", trial: "#ffb74d", error: "#ff8a80", warn: "#ffd54f", font: "Inter" })
 
         function result(fileName, fp) {
             rev; // dependency
@@ -222,6 +224,7 @@ ShellRoot {
                 settingsFile = m.settingsFile;
                 recipeFile = m.recipeFile || "";
                 settingsWarning = m.settingsWarning || "";
+                matugenWarning = m.matugenWarning || "";
                 problems = m.problems;
                 discardSettings();
                 recipe = m.recipe;

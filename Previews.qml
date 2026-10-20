@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Mock-ups of the selected wallpaper for the current recipe and the trial recipe side by side (ticket 06, as the
 // previews of variant D in the prototype): desktop (Bar + control centre) above kitty in each column.
 // While a result is still computing, a column keeps the last palette it had and says "computing…", so moving a

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Desktop mock-up for one palette: the wallpaper with the Ajmashell Bar (islands as in NOTES.md "Bar look and
 // layout": tray left; media, clock on the axis and workspaces in the centre; volume, mic, separator and the
 // BT / Wi-Fi / bell pill right) and the control centre open under the bell. Colours: Mockups.desktop().

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 .pragma library
 // The one place that says which matugen token paints which part of the mock-ups (ticket 06, story 41).
 // Change it together with the system file named in each section, or the mock-ups drift from the real desktop.

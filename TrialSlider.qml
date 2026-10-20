@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Slider of one number of the trial recipe. Range from palette_recipe.options(); a missing low end (no limit, as
 // lightnessDark: matugen takes -inf..1) gets the floor below. The value is rounded to 0.05 steps, so the fingerprint
 // does not depend on float noise. No keyboard focus: the arrows keep moving the strip.
