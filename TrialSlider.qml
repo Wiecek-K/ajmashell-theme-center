@@ -1,4 +1,4 @@
-// Slider of one number of the Przepis próbny. Range from palette_recipe.options(); a missing low end (no limit, as
+// Slider of one number of the trial recipe. Range from palette_recipe.options(); a missing low end (no limit, as
 // lightnessDark: matugen takes -inf..1) gets the floor below. The value is rounded to 0.05 steps, so the fingerprint
 // does not depend on float noise. No keyboard focus: the arrows keep moving the strip.
 import QtQuick
@@ -16,7 +16,7 @@ Column {
     spacing: 4
 
     Text {
-        text: s.label + "  " + s.value.toFixed(2) + (s.value !== s.current ? "   (obecny " + s.current.toFixed(2) + ")" : "")
+        text: s.label + "  " + s.value.toFixed(2) + (s.value !== s.current ? "   (current " + s.current.toFixed(2) + ")" : "")
         color: s.value !== s.current ? s.app.ui.trial : s.app.ui.dim
         font { family: s.app.ui.font; pixelSize: 11 }
     }

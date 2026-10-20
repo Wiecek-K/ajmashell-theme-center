@@ -1,5 +1,5 @@
-// Right panel (variant D of the prototype): controls of the Przepis próbny next to the Przepis obecny (the system
-// file), "przywróć obecny", "zapisz jako Przepis systemu" with the steps after it, folder progress for both recipes,
+// Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
+// file), "restore current", "save as system recipe" with the steps after it, folder progress for both recipes,
 // the summary of what the trial changes, the last copied hex. Lists and ranges of the controls come from the helper
 // (palette_recipe.options()), never copied here.
 pragma ComponentBehavior: Bound
@@ -15,9 +15,9 @@ Rectangle {
     readonly property var t: app.trial
     readonly property var o: app.options
     // story 4 of the spec; a rule the module adds later shows its own name
-    readonly property var ruleNames: ({ dominant: "najbardziej dominujący", darkness: "najciemniejszy",
-                                        lightness: "najjaśniejszy", saturation: "najbardziej nasycony",
-                                        "less-saturation": "najmniej nasycony", value: "największa jasność" })
+    readonly property var ruleNames: ({ dominant: "most dominant", darkness: "darkest",
+                                        lightness: "lightest", saturation: "most saturated",
+                                        "less-saturation": "least saturated", value: "highest value" })
     function ruleName(rule) { return ruleNames[rule] || rule; }
 
     Flickable {
@@ -32,8 +32,8 @@ Rectangle {
             width: parent.width
             spacing: 14
 
-            Text { text: "Przepis obecny"; color: p.app.ui.accent; font { family: p.app.ui.font; pixelSize: 14; bold: true } }
-            Text { text: "plik Przepisu systemu"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
+            Text { text: "Current recipe"; color: p.app.ui.accent; font { family: p.app.ui.font; pixelSize: 14; bold: true } }
+            Text { text: "the system palette recipe file"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
             Grid {
                 columns: 2
                 columnSpacing: 12
@@ -41,10 +41,10 @@ Rectangle {
                 Repeater {
                     // label, value, label, value, …
                     model: p.r ? [
-                        "Wybór Seeda", p.ruleName(p.r.seed.rule),
-                        "Schemat", p.r.palette.scheme.replace("scheme-", ""),
-                        "Kontrast", p.r.palette.contrast.toFixed(2),
-                        "Jasność ciemnej", p.r.palette.lightnessDark.toFixed(2)
+                        "Seed choice", p.ruleName(p.r.seed.rule),
+                        "Scheme", p.r.palette.scheme.replace("scheme-", ""),
+                        "Contrast", p.r.palette.contrast.toFixed(2),
+                        "Dark lightness", p.r.palette.lightnessDark.toFixed(2)
                     ] : []
                     Text {
                         required property string modelData
@@ -63,14 +63,14 @@ Rectangle {
                 height: 24
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Przepis próbny"
+                    text: "Trial recipe"
                     color: p.app.ui.trial
                     font { family: p.app.ui.font; pixelSize: 14; bold: true }
                 }
                 Chip {
                     anchors.right: parent.right
                     app: p.app
-                    label: "przywróć obecny"
+                    label: "restore current"
                     tone: p.app.ui.accent
                     enabled: p.app.trialDiffers || p.app.trialEdited
                     onClicked: p.app.restore()
@@ -80,7 +80,7 @@ Rectangle {
             Column {
                 width: parent.width
                 spacing: 6
-                Text { text: "Wybór Seeda"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
+                Text { text: "Seed choice"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
                 Flow {
                     width: parent.width
                     spacing: 6
@@ -102,7 +102,7 @@ Rectangle {
             Column {
                 width: parent.width
                 spacing: 6
-                Text { text: "Schemat palety"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
+                Text { text: "Palette scheme"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
                 Flow {
                     width: parent.width
                     spacing: 6
@@ -124,21 +124,21 @@ Rectangle {
             TrialSlider {
                 width: parent.width
                 app: p.app
-                label: "Kontrast"
+                label: "Contrast"
                 key: "contrast"
                 range: p.o ? p.o.contrast : [-1, 1]
             }
             TrialSlider {
                 width: parent.width
                 app: p.app
-                label: "Jasność palety ciemnej"
+                label: "Dark palette lightness"
                 key: "lightnessDark"
                 range: p.o ? p.o.lightnessDark : [null, 1]
             }
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Niebieska ramka i kreska: wartość Przepisu obecnego."
+                text: "Blue frame and tick: value of the current recipe."
                 color: p.app.ui.dim
                 font { family: p.app.ui.font; pixelSize: 11 }
             }
@@ -146,21 +146,21 @@ Rectangle {
             // story 51-55: one button, no commit; the steps after the file run in the helper's background
             Chip {
                 app: p.app
-                label: p.app.saving ? "zapisuję…" : "zapisz jako Przepis systemu"
+                label: p.app.saving ? "saving…" : "save as system recipe"
                 tone: p.app.ui.trial
                 selected: p.app.trialEdited && !p.app.saving && !p.app.applying
                 enabled: selected
                 onClicked: p.app.saveTrial()
             }
             Text {
-                readonly property var stages: ({ indexer: "Zapisano plik Przepisu. Przeliczam indeks karuzeli…",
-                                                 wallpaper: "Nakładam nowy Przepis na bieżącą tapetę…",
-                                                 done: "Zapisano i nałożono na pulpit. Bez commita w dotfiles.",
-                                                 error: "Plik zapisany, ale nałożenie się nie udało: " })
+                readonly property var stages: ({ indexer: "Palette recipe file saved. Rebuilding the carousel index…",
+                                                 wallpaper: "Applying the new recipe to the current wallpaper…",
+                                                 done: "Saved and applied to the desktop. No commit in the dotfiles.",
+                                                 error: "File saved, but applying it failed: " })
                 visible: text !== ""
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: p.app.saveError ? "Nie zapisano: " + p.app.saveError
+                text: p.app.saveError ? "Not saved: " + p.app.saveError
                       : p.app.applyStage ? stages[p.app.applyStage] + (p.app.applyStage === "error" ? p.app.applyError : "") : ""
                 color: p.app.saveError || p.app.applyStage === "error" ? p.app.ui.error
                        : p.app.applying ? p.app.ui.text : p.app.ui.dim
@@ -170,12 +170,12 @@ Rectangle {
             Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
 
             Repeater {
-                model: [["obecny", p.app.fingerprint], ["próbny", p.app.trialFingerprint]]
+                model: [["current", p.app.fingerprint], ["trial", p.app.trialFingerprint]]
                 Text {
                     id: pr
                     required property var modelData
                     readonly property int n: p.app.doneOf(pr.modelData[1])
-                    text: (pr.n < p.app.total ? "Liczenie " : "Policzone ") + pr.modelData[0] + " " + pr.n + "/" + p.app.total
+                    text: (pr.n < p.app.total ? "Computing " : "Computed ") + pr.modelData[0] + " " + pr.n + "/" + p.app.total
                     color: pr.n < p.app.total ? p.app.ui.text : p.app.ui.dim
                     font { family: "monospace"; pixelSize: 13 }
                 }
@@ -185,8 +185,8 @@ Rectangle {
                 // only the selected wallpaper
                 visible: p.app.trialDiffers && p.app.doneOf(p.app.trialFingerprint) < p.app.total
                 app: p.app
-                label: p.app.trialAll ? "liczę pozostałe tapety…" : "przelicz wszystkie tapety ("
-                       + (p.app.total - p.app.doneOf(p.app.trialFingerprint)) + " brakuje)"
+                label: p.app.trialAll ? "computing the other wallpapers…" : "compute all wallpapers ("
+                       + (p.app.total - p.app.doneOf(p.app.trialFingerprint)) + " missing)"
                 selected: p.app.trialAll
                 onClicked: if (!p.app.trialAll) p.app.computeAll()
             }
@@ -196,23 +196,23 @@ Rectangle {
                 spacing: 4
                 readonly property var s: p.app.summary
                 Text {
-                    text: "Próba zmienia"
+                    text: "The trial changes"
                     color: p.app.ui.dim
                     font { family: p.app.ui.font; pixelSize: 11 }
                 }
                 Text {
-                    text: "Seed: " + sum.s.seed + " tapet"
+                    text: "Seed: " + sum.s.seed + " wallpapers"
                     color: sum.s.seed ? p.app.ui.trial : p.app.ui.text
                     font { family: p.app.ui.font; pixelSize: 13; bold: true }
                 }
                 Text {
-                    text: "tylko paletę: " + sum.s.palette + " tapet"
+                    text: "palette only: " + sum.s.palette + " wallpapers"
                     color: sum.s.palette ? p.app.ui.trial : p.app.ui.text
                     font { family: p.app.ui.font; pixelSize: 13; bold: true }
                 }
                 Text {
-                    text: "bez zmian: " + (sum.s.both - sum.s.seed - sum.s.palette)
-                          + (sum.s.both < p.app.total ? "   (porównane " + sum.s.both + "/" + p.app.total + ")" : "")
+                    text: "unchanged: " + (sum.s.both - sum.s.seed - sum.s.palette)
+                          + (sum.s.both < p.app.total ? "   (compared " + sum.s.both + "/" + p.app.total + ")" : "")
                     color: p.app.ui.dim
                     font { family: p.app.ui.font; pixelSize: 12 }
                 }
@@ -223,7 +223,7 @@ Rectangle {
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: p.app.copied ? "Skopiowano " + p.app.copied : "Klik w hex kopiuje."
+                text: p.app.copied ? "Copied " + p.app.copied : "Click a hex to copy it."
                 color: p.app.ui.dim
                 font { family: p.app.ui.font; pixelSize: 12 }
             }

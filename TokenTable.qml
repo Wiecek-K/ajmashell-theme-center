@@ -1,6 +1,6 @@
 // Full token table of the dark palette (all tokens matugen gives, as in ~/.local/state/ajmashell/colors.json),
 // as in variant D of the prototype: groups in two columns when there is room, row = token name + swatch with hex for
-// the Przepis obecny and the Przepis próbny; "≠" and the trial colour mark a token the trial changes.
+// the current recipe and the trial recipe; "≠" and the trial colour mark a token the trial changes.
 // A click on a swatch copies the hex.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -19,22 +19,22 @@ Grid {
     columnSpacing: 28
     rowSpacing: 14
 
-    // Groups by role; a token matugen adds later lands in "Inne".
+    // Groups by role; a token matugen adds later lands in "Other".
     readonly property var groups: {
         const g = [
-            { name: "Akcent", tokens: ["primary", "on_primary", "primary_container", "on_primary_container", "primary_fixed",
+            { name: "Primary", tokens: ["primary", "on_primary", "primary_container", "on_primary_container", "primary_fixed",
                                         "primary_fixed_dim", "on_primary_fixed", "on_primary_fixed_variant", "inverse_primary", "surface_tint"] },
-            { name: "Drugi", tokens: ["secondary", "on_secondary", "secondary_container", "on_secondary_container", "secondary_fixed",
+            { name: "Secondary", tokens: ["secondary", "on_secondary", "secondary_container", "on_secondary_container", "secondary_fixed",
                                        "secondary_fixed_dim", "on_secondary_fixed", "on_secondary_fixed_variant"] },
-            { name: "Trzeci", tokens: ["tertiary", "on_tertiary", "tertiary_container", "on_tertiary_container", "tertiary_fixed",
+            { name: "Tertiary", tokens: ["tertiary", "on_tertiary", "tertiary_container", "on_tertiary_container", "tertiary_fixed",
                                         "tertiary_fixed_dim", "on_tertiary_fixed", "on_tertiary_fixed_variant"] },
-            { name: "Powierzchnie", tokens: ["background", "on_background", "surface", "surface_dim", "surface_bright",
+            { name: "Surfaces", tokens: ["background", "on_background", "surface", "surface_dim", "surface_bright",
                                               "surface_container_lowest", "surface_container_low", "surface_container",
                                               "surface_container_high", "surface_container_highest", "surface_variant",
                                               "inverse_surface", "inverse_on_surface"] },
-            { name: "Tekst i linie", tokens: ["on_surface", "on_surface_variant", "outline", "outline_variant"] },
-            { name: "Błąd", tokens: ["error", "on_error", "error_container", "on_error_container"] },
-            { name: "Inne", tokens: ["source_color", "shadow", "scrim"] }
+            { name: "Text and lines", tokens: ["on_surface", "on_surface_variant", "outline", "outline_variant"] },
+            { name: "Error", tokens: ["error", "on_error", "error_container", "on_error_container"] },
+            { name: "Other", tokens: ["source_color", "shadow", "scrim"] }
         ];
         const all = colors || trialColors;
         if (all) {
@@ -54,8 +54,8 @@ Grid {
             Row {
                 spacing: 8
                 Text { width: t.nameWidth; text: "token"; color: t.app.ui.dim; font { family: t.app.ui.font; pixelSize: 10 } }
-                Text { width: 110; text: "obecny"; color: t.app.ui.accent; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
-                Text { width: 110; text: "próbny"; color: t.app.ui.trial; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
+                Text { width: 110; text: "current"; color: t.app.ui.accent; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
+                Text { width: 110; text: "trial"; color: t.app.ui.trial; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
             }
             Repeater {
                 model: grp.modelData.tokens

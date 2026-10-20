@@ -1,6 +1,6 @@
-// Mock-ups of the selected wallpaper for the Przepis obecny and the Przepis próbny side by side (ticket 06, as the
-// previews of variant D in the prototype): desktop (Bar + Centrum sterowania) above kitty in each column.
-// While a result is still computing, a column keeps the last palette it had and says "liczenie…", so moving a
+// Mock-ups of the selected wallpaper for the current recipe and the trial recipe side by side (ticket 06, as the
+// previews of variant D in the prototype): desktop (Bar + control centre) above kitty in each column.
+// While a result is still computing, a column keeps the last palette it had and says "computing…", so moving a
 // control or the strip never shows an empty or grey frame.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -17,7 +17,7 @@ Column {
             required property string modelData
             width: p.width
             wrapMode: Text.Wrap
-            text: "Makiety: " + modelData
+            text: "Mock-ups: " + modelData
             color: p.app.ui.error
             font { family: p.app.ui.font; pixelSize: 12 }
         }
@@ -47,8 +47,8 @@ Column {
                 Text {
                     width: parent.width
                     elide: Text.ElideRight
-                    text: (col.trial ? "Próbny" : "Obecny") + (col.ready ? " · Seed " + col.res.seed
-                          : col.res && col.res.error ? " · błąd matugena" : " · liczenie…")
+                    text: (col.trial ? "Trial" : "Current") + (col.ready ? " · seed " + col.res.seed
+                          : col.res && col.res.error ? " · matugen error" : " · computing…")
                     color: col.trial ? p.app.ui.trial : p.app.ui.accent
                     font { family: p.app.ui.font; pixelSize: 12; bold: true }
                 }

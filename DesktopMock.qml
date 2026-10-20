@@ -1,6 +1,7 @@
 // Desktop mock-up for one palette: the wallpaper with the Ajmashell Bar (islands as in NOTES.md "Bar look and
 // layout": tray left; media, clock on the axis and workspaces in the centre; volume, mic, separator and the
-// BT / Wi-Fi / bell pill right) and the Centrum sterowania open under the bell. Colours: Mockups.desktop().
+// BT / Wi-Fi / bell pill right) and the control centre open under the bell. Colours: Mockups.desktop().
+// The texts copy the real Ajmashell, whose interface is Polish, so they stay Polish (mock-up content, ticket 08).
 // Built on MockPulpit.qml of the prototype (branch prototype/faza-e-karta-ui), laid out after the real Bar.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -104,7 +105,7 @@ Item {
         }
     }
 
-    // --- Centrum sterowania, under the bell ---
+    // --- control centre, under the bell ---
     Rectangle {
         anchors { right: parent.right; top: rightIslands.bottom; margins: 4 }
         width: Math.min(150, parent.width * 0.42)

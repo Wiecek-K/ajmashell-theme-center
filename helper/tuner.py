@@ -1,31 +1,34 @@
 #!/usr/bin/env python3
-# Helper of the palette tuning tool (faza E, ADR 0019): computes, with the real matugen, the palette the system would
-# give each carousel wallpaper for a given Przepis palety. Long-lived; talks to the QML window by JSON messages, one
-# per line. The Przepis logic (validation, matugen flags, fingerprint) and the colour buckets are imported from the
-# dotfiles by path, never copied, so the tool shows exactly what wpapply.sh and the carousel indexer would do.
+# Helper of Ajmashell Theme Center, palette tuning (faza E, ADR 0019): computes, with the real matugen, the palette the
+# system would give each carousel wallpaper for a given palette recipe. Long-lived; talks to the QML window by JSON
+# messages, one per line. The recipe logic (validation, matugen flags, fingerprint) and the colour categories are
+# imported from the dotfiles by path, never copied, so the tool shows exactly what wpapply.sh and the carousel
+# indexer would do.
 #
 # Window -> helper (stdin):
 #   {"type": "compute", "recipes": [{...} | null, ...], "orders": [[fileName, ...], ...]}
-#       recipes = Przepis obecny and Przepis próbny (null = the system Przepis file); orders[i] = wallpapers to compute
-#       for recipes[i], the selected one first (the trial gets only the selected one until the user asks for all).
+#       recipes = current recipe and trial recipe (null = the system palette recipe file); orders[i] = wallpapers to
+#       compute for recipes[i], the selected one first (the trial gets only the selected one until the user asks for
+#       all).
 #       Jobs run wallpaper by wallpaper in the order of the longest list. A new request replaces the queue of the
 #       previous one: jobs it no longer names are dropped, the rest follow the new order.
 #   {"type": "save", "recipe": {...}}
-#       write the recipe as the system Przepis (palette_recipe.save: strict validation, atomic, no commit), then in the
-#       background the carousel indexer and wpapply.sh on the current wallpaper (ticket 07). Saves run one at a time.
+#       write the recipe as the system palette recipe (palette_recipe.save: strict validation, atomic, no commit), then
+#       in the background the carousel indexer and wpapply.sh on the current wallpaper (ticket 07). Saves run one at
+#       a time.
 # Helper -> window (stdout):
 #   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint",
 #    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]},   (palette_recipe.options())
 #    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]}}
 #       (system_look(): what the mock-ups read from the system's own files, see there)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
-#   {"type": "result", "fingerprint", "fileName", "candidates": [hex], "seed": hex, "bucket", "colors": {token: hex}}
+#   {"type": "result", "fingerprint", "fileName", "candidates": [hex], "seed": hex, "category", "colors": {token: hex}}
 #   {"type": "error", "fingerprint", "fileName", "message"}
 #   {"type": "progress", "fingerprint", "done": n, "total": n}   (per recipe; total = all wallpapers)
 #   {"type": "saved", "recipe": {...}, "fingerprint"} | {"type": "saved", "error": text}   (file written or not)
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #
-# Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in ~/.cache/matugen-ajmashell-tool, so a
+# Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in ~/.cache/ajmashell-theme-center, so a
 # second start is instant. At most half the cores, like the indexer (the CPU is this machine's bottleneck).
 
 import hashlib
@@ -42,7 +45,7 @@ HOME = os.path.expanduser("~")
 DOTFILES_WALLPAPER = os.path.join(HOME, ".config/quickshell/ajmashell/wallpaper")  # palette_recipe.py, indexer.py
 INDEX = os.path.join(HOME, ".cache/ajmashell/wallpapers/index.json")
 CURRENT = os.path.join(HOME, ".config/hypr/current_wallpaper")
-CACHE = os.path.join(HOME, ".cache/matugen-ajmashell-tool/results")
+CACHE = os.path.join(HOME, ".cache/ajmashell-theme-center/results")
 KITTY_TEMPLATE = os.path.join(HOME, ".config/matugen/templates/kitty-colors.conf")
 LOOKNFEEL = os.path.join(HOME, ".config/hypr/configs/looknfeel.lua")
 RULES = os.path.join(HOME, ".config/hypr/configs/rules.lua")
@@ -52,7 +55,7 @@ WORKERS = max(1, (os.cpu_count() or 2) // 2)
 
 sys.dont_write_bytecode = True  # no __pycache__ in the dotfiles
 sys.path.insert(0, DOTFILES_WALLPAPER)
-import indexer  # noqa: E402  (color_bucket: the carousel's own thresholds)
+import indexer  # noqa: E402  (color_bucket: the carousel's own thresholds = the colour category)
 import palette_recipe  # noqa: E402
 
 out_lock = threading.Lock()
@@ -106,24 +109,24 @@ def system_look():
     for m in re.finditer(r"^\s*(\w+)\s+\{\{\s*colors\.(\w+)\.default\.hex\s*\}\}", read(KITTY_TEMPLATE), re.M):
         look["kitty"][m.group(1)] = m.group(2)
     if not look["kitty"]:
-        look["problems"].append(f"{KITTY_TEMPLATE}: brak linii z kolorami")
+        look["problems"].append(f"{KITTY_TEMPLATE}: no colour lines")
     m = re.search(r"active_border\s*=\s*\{\s*colors\s*=\s*\{([^}]*)\}\s*,\s*angle\s*=\s*(-?\d+)", read(LOOKNFEEL))
     if m:
         look["border"] = re.findall(r"c\.(\w+)", m.group(1))
         look["borderAngle"] = int(m.group(2))
     if not look["border"]:
-        look["problems"].append(f"{LOOKNFEEL}: nie rozpoznano active_border")
+        look["problems"].append(f"{LOOKNFEEL}: active_border not recognised")
     m = re.search(r'class\s*=\s*"\^\(kitty\)\$"[^\n]*opacity\s*=\s*"([0-9.]+)', read(RULES))
     if m:
         look["kittyOpacity"] = float(m.group(1))
     else:
-        look["problems"].append(f"{RULES}: nie rozpoznano reguły okna kitty (opacity)")
+        look["problems"].append(f"{RULES}: kitty window rule (opacity) not recognised")
     return look
 
 
 def compute(item, recipe):
-    """Same steps as the system: the indexer picks the Seed from the thumbnail with the recipe's flags, wpapply.sh
-    builds the palette from the Seed with `matugen color hex` and the palette flags (dark = the system's mode)."""
+    """Same steps as the system: the indexer picks the seed from the thumbnail with the recipe's flags, wpapply.sh
+    builds the palette from the seed with `matugen color hex` and the palette flags (dark = the system's mode)."""
     thumb = item["thumb"]
     candidates = matugen(["image", "--show-source-colors", thumb]).split()
     seed_flags = palette_recipe.seed_flags(recipe)
@@ -133,7 +136,7 @@ def compute(item, recipe):
     pal = json.loads(matugen(["color", "hex", seed, "--dry-run", "-q", "-j", "hex", *palette_flags]))
     colors = {k: v["dark"]["color"].lower() for k, v in sorted(pal["colors"].items())}
     return {"candidates": [c.lower() for c in candidates], "seed": seed,
-            "bucket": indexer.color_bucket(colors["primary"]), "colors": colors}
+            "category": indexer.color_bucket(colors["primary"]), "colors": colors}
 
 
 def cache_file(item, fingerprint):
@@ -259,9 +262,9 @@ def run_step(cmd):
 
 
 def save(recipe):
-    """Story 51-55: the trial becomes the system Przepis. The file first (the window takes it over as the Przepis
-    obecny at once), then the carousel index (Seeds and buckets of the new recipe, thumbnails kept) and wpapply.sh on
-    the current wallpaper, so the desktop shows the new colours. wpapply.sh would run the indexer itself for a stale
+    """Story 51-55: the trial becomes the system palette recipe. The file first (the window takes it over as the
+    current recipe at once), then the carousel index (seeds and colour categories of the new recipe, thumbnails
+    kept) and wpapply.sh on the current wallpaper, so the desktop shows the new colours. wpapply.sh would run the indexer itself for a stale
     entry, but only for the current wallpaper's folder and without a report; here every step reports to the window."""
     try:
         valid = palette_recipe.save(recipe)
@@ -275,7 +278,7 @@ def save(recipe):
     if err is None:
         current = os.path.realpath(CURRENT) if os.path.exists(CURRENT) else None
         if current is None:
-            err = f"{CURRENT}: brak bieżącej tapety"
+            err = f"{CURRENT}: no current wallpaper"
         else:
             send({"type": "apply", "stage": "wallpaper"})
             err = run_step([WPAPPLY, current])

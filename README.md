@@ -1,60 +1,85 @@
-# Strojenie palety matugena
+# Ajmashell Theme Center
 
-Prywatne narzędzie fazy E projektu migracji Hyprlanda (`~/Projects/hyprland-lua-migration`, ADR 0019, spec
-`.scratch/faza-e/spec.md`). Okno Quickshell poza Ajmashellem i poza dotfiles; lokalny git bez remote.
-Pokazuje dla każdej tapety karuzeli paletę, którą da system według Przepisu palety.
+A Quickshell window for tuning the colours of Ajmashell. For every wallpaper of the Ajmashell carousel it shows the
+palette the system gives it under the palette recipe, and lets you try another recipe before you save it as the
+system one.
 
-## Start
+It needs Ajmashell: it reads the carousel index, imports the palette recipe module from the Ajmashell install and runs
+its scripts after a save. There is no stand-alone mode.
 
-- Launcher: „Strojenie palety matugena” (`~/.local/share/applications/matugen-ajmashell-tool.desktop`,
-  kopia w repo: `matugen-ajmashell-tool.desktop`; po zmianie: `install -Dm644 matugen-ajmashell-tool.desktop ~/.local/share/applications/`).
-- Ręcznie: `qs -n -p ~/Projects/matugen-ajmashell-tool` (`-n`: drugie uruchomienie nie otwiera drugiego okna).
-- Klawisze: `↑` `↓` (i `←` `→`) zmieniają tapetę, `Home` / `End` pierwsza / ostatnia. Klik w próbkę kopiuje hex.
-- Kontrolki (panel z prawej) zmieniają Przepis próbny: reguła Seeda, schemat, kontrast, jasność palety ciemnej.
-  Listy i zakresy z `palette_recipe.options()`; jasność ciemnej nie ma dolnej granicy w matugenie (−∞), suwak
-  zaczyna się od −1. Żądanie idzie do pomocnika po 300 ms spokoju (debounce). Próba liczy się tylko dla wybranej
-  tapety (i każdej, którą potem wybierzesz); resztę folderu liczy przycisk „przelicz wszystkie tapety”. „przywróć obecny” wraca do pliku
-  Przepisu systemu. Taśma: „Seed” / „paleta” = co próba zmienia na tej tapecie; drugi punkt = Seed próbny.
-- „zapisz jako Przepis systemu” zapisuje próbę przez `palette_recipe.save()` (atomowo, bez commita), potem w tle
-  `indexer.py` i `wpapply.sh` na bieżącej tapecie; etapy pod przyciskiem. Zapisany Przepis staje się obecnym.
+Status: phase E of the Hyprland migration project (`~/Projects/hyprland-lua-migration`, ADR 0019, spec
+`.scratch/faza-e/spec.md`). A local git repository without a remote for now; publishing and installing come with
+ticket 11.
 
-## Budowa
+## Terms
 
-| Plik | Rola |
+| Term | Meaning |
 |---|---|
-| `shell.qml` | stan okna i protokół z pomocnikiem; `//@ pragma AppId` daje klasę okna `matugen-ajmashell-tool` |
-| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (z `Chip.qml`, `TrialSlider.qml`) | układ wariantu D z prototypu (gałąź `prototype/faza-e-karta-ui`): taśma z lewej, podgląd z Kandydatami i tabela w środku, panel z prawej |
-| `Previews.qml` (z `DesktopMock.qml`, `KittyMock.qml`) | makiety pulpitu (Bar + Centrum sterowania) i kitty dla Przepisu obecnego i próbnego obok siebie; obok tabeli, gdy okno jest szerokie (tabela w dwóch kolumnach + co najmniej 420 px), inaczej pod Kandydatami |
-| `Mockups.js` | jedyne miejsce mapowania tokenów na elementy makiet, z komentarzem, skąd pochodzi każde (role `Theme.qml` Ajmashella w wyglądzie `fancy2`; kitty i ramka z plików systemu, patrz niżej) |
-| `helper/tuner.py` | pomocnik: prawdziwy matugen, moduł Przepisu i kategorie z dotfiles (import po ścieżce, bez kopii) |
+| palette recipe | the settings that turn a wallpaper into a palette: how the seed is chosen and the matugen palette flags |
+| current recipe | the system palette recipe file, as Ajmashell uses it now |
+| trial recipe | a copy of the current recipe that the controls change; nothing in the system changes until you save it |
+| candidate | one of the colours matugen finds in the wallpaper's thumbnail, most dominant first |
+| seed | the candidate the recipe picks; matugen builds the whole palette from it |
+| colour category | the carousel's colour filter for a wallpaper (from the indexer), taken from the palette's `primary` |
 
-Protokół (JSON, jeden komunikat w linii) opisany w nagłówku `helper/tuner.py`.
-Cache wyników: `~/.cache/matugen-ajmashell-tool/results` (klucz: ścieżka, mtime, rozmiar tapety, odcisk Przepisu);
-można go usunąć w każdej chwili. Po aktualizacji matugena usuń go (odcisk nie obejmuje wersji matugena).
+## Running it
 
-## Zależności od dotfiles (ADR 0019, skutki)
+- Launcher: "Ajmashell Theme Center" (`~/.local/share/applications/ajmashell-theme-center.desktop`, copy in this repo:
+  `ajmashell-theme-center.desktop`; after a change: `install -Dm644 ajmashell-theme-center.desktop ~/.local/share/applications/`).
+- By hand: `qs -n -p ~/Projects/ajmashell-theme-center` (`-n`: a second start does not open a second window).
+- Keys: `↑` `↓` (and `←` `→`) change the wallpaper, `Home` / `End` the first / last one. A click on a swatch copies its hex.
+- The controls (panel on the right) change the trial recipe: seed choice, scheme, contrast, dark palette lightness.
+  Their lists and ranges come from `palette_recipe.options()`; the dark lightness has no lower limit in matugen (−∞),
+  so its slider starts at −1. A request goes to the helper after 300 ms without changes (debounce). The trial is
+  computed for the selected wallpaper only (and for each one you select later); "compute all wallpapers" computes the
+  rest of the folder. "restore current" goes back to the system palette recipe file. Strip: "seed" / "palette" = what
+  the trial changes on that wallpaper; the second dot is the trial seed.
+- "save as system recipe" writes the trial through `palette_recipe.save()` (atomic, no commit), then runs `indexer.py`
+  and `wpapply.sh` on the current wallpaper in the background; the steps show under the button. The saved recipe
+  becomes the current one.
 
-Zmiana tych ścieżek w Ajmashellu psuje narzędzie bez ostrzeżenia:
+## Layout
 
-- `~/.config/quickshell/ajmashell/wallpaper/palette_recipe.py` (`load`, `seed_flags`, `palette_flags`, `fingerprint`,
-  `options`)
-  i `indexer.py` (`color_bucket`),
-- `~/.config/matugen/przepis-palety.json` (Przepis systemu; zapis przez `palette_recipe.save`),
-- `~/.config/hypr/scripts/wpapply.sh` (nałożenie po zapisie; `indexer.py` też uruchamiany),
-- `~/.cache/ajmashell/wallpapers/index.json` (lista tapet i miniatury),
-- `~/.config/hypr/current_wallpaper` (bieżąca tapeta),
-- makiety czytają przy starcie (`system_look()` w pomocniku): szablon `~/.config/matugen/templates/kitty-colors.conf`
-  (linie `klucz {{ colors.TOKEN.default.hex }}`), `active_border` z `~/.config/hypr/configs/looknfeel.lua` i krycie
-  reguły okna kitty z `~/.config/hypr/configs/rules.lua`. Gdy czegoś nie rozpozna, okno pokazuje to na czerwono nad
-  makietami, a brakujący kolor jest szary. Role Ajmashella (wyspy Bara, Centrum sterowania) są przepisane ręcznie
-  w `Mockups.js`: po zmianie `Theme.qml` popraw je tam,
-- reguła okna `matugen-ajmashell-tool` w `~/.config/hypr/configs/rules.lua` (`opacity 1.0 override`).
+| File | Role |
+|---|---|
+| `shell.qml` | window state and the protocol with the helper; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
+| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | layout of variant D of the prototype (branch `prototype/faza-e-karta-ui`): strip on the left, preview with the candidates and the token table in the middle, panel on the right |
+| `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
+| `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml` in the look `fancy2`; kitty and the border from the system's files, see below) |
+| `helper/tuner.py` | the helper: real matugen, the recipe module and the colour categories from the dotfiles (imported by path, not copied) |
 
-Paleta liczona jak w systemie: Seed z miniatury flagami Przepisu (jak indexer), paleta z Seeda przez
-`matugen color hex` z flagami palety (jak `wpapply.sh`), tryb ciemny. Dla bieżącej tapety wynik jest równy
-`~/.local/state/ajmashell/colors.json` (sprawdzone 2026-10-20, 50 tokenów).
+The protocol (JSON, one message per line) is described in the header of `helper/tuner.py`.
+Result cache: `~/.cache/ajmashell-theme-center/results` (key: wallpaper path, mtime, size, recipe fingerprint); safe to
+delete at any time. Delete it after a matugen update (the fingerprint does not cover the matugen version).
 
-## Testy
+The texts of the desktop mock-up (control centre, volume, …) copy the real Ajmashell, whose interface is Polish, so
+they stay Polish. Everything else in the window is English.
 
-Bez testów automatycznych (decyzja użytkownika 2026-10-20). Weryfikacja: zrzuty okna w pełnym ekranie 2560×1440
-i w kafelku na pół ekranu, okno szukane po PID (reguła z `CLAUDE.md` projektu migracji).
+## Dependencies on the dotfiles (ADR 0019, consequences)
+
+A change of these paths in Ajmashell breaks the tool without a warning:
+
+- `~/.config/quickshell/ajmashell/wallpaper/palette_recipe.py` (`load`, `save`, `seed_flags`, `palette_flags`,
+  `fingerprint`, `options`) and `indexer.py` (`color_bucket`, the colour category),
+- `~/.config/matugen/przepis-palety.json` (the system palette recipe; written through `palette_recipe.save`; renamed to
+  `palette-recipe.json` in ticket 10),
+- `~/.config/hypr/scripts/wpapply.sh` (applies the palette after a save; `indexer.py` runs too),
+- `~/.cache/ajmashell/wallpapers/index.json` (wallpaper list and thumbnails),
+- `~/.config/hypr/current_wallpaper` (the current wallpaper),
+- the mock-ups read on start (`system_look()` in the helper): the template `~/.config/matugen/templates/kitty-colors.conf`
+  (lines `key {{ colors.TOKEN.default.hex }}`), `active_border` from `~/.config/hypr/configs/looknfeel.lua` and the
+  opacity of the kitty window rule from `~/.config/hypr/configs/rules.lua`. Whatever it cannot recognise shows in red
+  above the mock-ups, and a missing colour is grey. The Ajmashell roles (Bar islands, control centre) are copied by
+  hand into `Mockups.js`: after a change of `Theme.qml`, fix them there,
+- the window rule `theme-center-opaque` (class `ajmashell-theme-center`) in `~/.config/hypr/configs/rules.lua`
+  (`opacity 1.0 override`).
+
+The palette is computed as in the system: the seed from the thumbnail with the recipe's flags (as the indexer), the
+palette from the seed through `matugen color hex` with the palette flags (as `wpapply.sh`), dark mode. For the current
+wallpaper the result equals `~/.local/state/ajmashell/colors.json` (checked 2026-10-20, 50 tokens).
+
+## Tests
+
+No automated tests yet (user decision 2026-10-20; helper tests come with ticket 09). Checked by screenshots of the
+window in full screen 2560×1440 and tiled on half the screen, the window found by PID (rule from the migration
+project's `CLAUDE.md`).

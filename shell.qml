@@ -1,11 +1,12 @@
-//@ pragma AppId matugen-ajmashell-tool
-// Palette tuning tool (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the system gives it.
+//@ pragma AppId ajmashell-theme-center
+// Ajmashell Theme Center, palette tuning (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the
+// system gives it.
 // Layout = variant D of the prototype (branch prototype/faza-e-karta-ui): strip of all wallpapers on the left, the
-// selected one with its Kandydaci and the full token table in the middle, panel on the right with the controls of the
-// Przepis próbny (ticket 05), and the desktop and kitty mock-ups of both Przepisy (ticket 06) between the table and
-// the panel, or under the Kandydaci when the window is too narrow for both. Colours come from helper/tuner.py (real
+// selected one with its candidates and the full token table in the middle, panel on the right with the controls of the
+// trial recipe (ticket 05), and the desktop and kitty mock-ups of both recipes (ticket 06) between the table and
+// the panel, or under the candidates when the window is too narrow for both. Colours come from helper/tuner.py (real
 // matugen through the dotfiles' palette_recipe.py); this file only holds the state and the protocol.
-// Start: qs -n -p ~/Projects/matugen-ajmashell-tool (the .desktop entry does the same).
+// Start: qs -n -p ~/Projects/ajmashell-theme-center (the .desktop entry does the same).
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -20,16 +21,16 @@ ShellRoot {
         property string current: ""     // fileName of the system's current wallpaper
         property int sel: 0
         readonly property var it: items.length ? items[sel] : null
-        property var recipe: null       // Przepis obecny (the system file, validated by the helper)
+        property var recipe: null       // current recipe (the system file, validated by the helper)
         property string fingerprint: ""
-        property var trial: null        // Przepis próbny: starts as a copy of the current one, changed by the controls
+        property var trial: null        // trial recipe: starts as a copy of the current one, changed by the controls
         property string trialFingerprint: ""
         // The trial is computed for the selected wallpaper only; the rest of the folder after the button
-        // "przelicz wszystkie" (user, 2026-10-20). A new trial value goes back to the selected one only.
+        // "compute all wallpapers" (user, 2026-10-20). A new trial value goes back to the selected one only.
         property bool trialAll: false
         property var options: null      // palette_recipe.options(): rules, schemes, number ranges
         property var look: null         // tuner.py system_look(): what the mock-ups read from the system's files
-        // results[fingerprint][fileName] = {seed, candidates, bucket, colors, key} or {error}; done[fingerprint] = n.
+        // results[fingerprint][fileName] = {seed, candidates, category, colors, key} or {error}; done[fingerprint] = n.
         // Messages write them at once, rev follows at most every 80 ms (pending): one rebind of the strip and the
         // summary per batch, not per message, so moving a control does not stall the window.
         property var results: ({})
@@ -37,7 +38,7 @@ ShellRoot {
         property int rev: 0
         property bool pending: false
         property string helperError: ""
-        // Saving the trial as the system Przepis (ticket 07): saving = the file is being written; applyStage = the
+        // Saving the trial as the system palette recipe (ticket 07): saving = the file is being written; applyStage = the
         // background steps after it ("indexer", "wallpaper", "done", "error"), shown in the panel
         property bool saving: false
         property string saveError: ""
@@ -49,7 +50,7 @@ ShellRoot {
 
         readonly property bool trialDiffers: fingerprint !== trialFingerprint
         readonly property int total: items.length
-        // the folder summary: wallpapers with both results, of them how many get another Seed / only another palette
+        // the folder summary: wallpapers with both results, of them how many get another seed / only another palette
         readonly property var summary: {
             rev; // dependency
             let both = 0, seed = 0, palette = 0;
@@ -77,7 +78,7 @@ ShellRoot {
             return done[fp] || 0;
         }
 
-        // What the trial changes on one wallpaper: "seed", "palette" (same Seed, other tokens), "same", or "" while
+        // What the trial changes on one wallpaper: "seed", "palette" (same seed, other tokens), "same", or "" while
         // either result is missing or failed.
         function diff(fileName) {
             const a = result(fileName, fingerprint), b = result(fileName, trialFingerprint);
@@ -124,7 +125,7 @@ ShellRoot {
             debounce.restart();
         }
 
-        // The trial becomes the system Przepis; the helper writes it through palette_recipe.save and answers "saved"
+        // The trial becomes the system palette recipe; the helper writes it through palette_recipe.save and answers "saved"
         function saveTrial() {
             if (saving || applying || !trialEdited) return;
             saving = true;
@@ -170,7 +171,7 @@ ShellRoot {
                 if (m.error) {
                     saveError = m.error;
                 } else {
-                    // story 54: the saved recipe is the Przepis obecny now, so the differences and the summary go;
+                    // story 54: the saved recipe is the current recipe now, so the differences and the summary go;
                     // the trial stays as it is (equal to it, unless a control moved after the click)
                     recipe = m.recipe;
                     fingerprint = m.fingerprint;
@@ -231,10 +232,10 @@ ShellRoot {
         }
         stderr: SplitParser { onRead: data => console.warn("tuner.py:", data) }
         onExited: code => {
-            app.helperError = "Pomocnik zakończył pracę (kod " + code + "), liczenie stoi. Szczegóły: journal / terminal.";
-            // a save in flight gets no answer any more: say so instead of "zapisuję…" for good
-            if (app.saving) app.saveError = "pomocnik nie odpowiedział; sprawdź plik Przepisu";
-            else if (app.applying) app.applyError = "pomocnik nie dokończył";
+            app.helperError = "The helper exited (code " + code + "), nothing is computed any more. Details: journal / terminal.";
+            // a save in flight gets no answer any more: say so instead of "saving…" for good
+            if (app.saving) app.saveError = "the helper did not answer; check the palette recipe file";
+            else if (app.applying) app.applyError = "the helper did not finish";
             if (app.applying) app.applyStage = "error";
             app.saving = false;
         }
@@ -242,7 +243,7 @@ ShellRoot {
 
     FloatingWindow {
         id: win
-        title: "Strojenie palety matugena"
+        title: "Ajmashell Theme Center"
         implicitWidth: 1600
         implicitHeight: 1000
         color: app.ui.bg
@@ -276,7 +277,7 @@ ShellRoot {
             }
 
             // Mock-ups beside the token table while the table keeps its two columns (980 px, TokenTable) and the
-            // mock-ups get at least 420 px (prototype); otherwise inside the view, under the Kandydaci (tiled window).
+            // mock-ups get at least 420 px (prototype); otherwise inside the view, under the candidates (tiled window).
             readonly property real centre: width - strip.width - 2 * 8 - side.width - 2 * 16
             readonly property bool mockupsBeside: centre - 980 - 16 >= 420
 

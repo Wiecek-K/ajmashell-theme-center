@@ -4,7 +4,7 @@
 //
 // - Ajmashell (Bar, popup): roles of ~/.config/quickshell/ajmashell/singletons/theme/Theme.qml, which reads the
 //   tokens written by the matugen template ajmashell-colors.json. Theme.qml is QML bindings, so its roles are
-//   copied here by hand (with the alphas); the popup is the Centrum sterowania in the look `fancy2`
+//   copied here by hand (with the alphas); the popup is the control centre in the look `fancy2`
 //   (singletons/look/Look.qml, the look a shell restart starts with).
 // - kitty: not copied. The helper reads the matugen template kitty-colors.conf on start (tuner.py system_look())
 //   and sends {kitty key: token}; kitty() below only turns a kitty key into a colour.
@@ -18,7 +18,7 @@ function alpha(hex, a) {
     return "#" + aa + hex.slice(1);
 }
 
-// Bar and the Centrum sterowania for one palette c = {token: hex}
+// Bar and the control centre for one palette c = {token: hex}
 function desktop(c) {
     const g = token => c && c[token] ? c[token] : "transparent"; // no palette yet: nothing drawn, no warnings
     return {

@@ -1,5 +1,5 @@
-// The selected wallpaper, as in variant D of the prototype: preview with the Kandydaci next to it (Seed of each
-// Przepis marked), the colour bucket of the carousel for both, the mock-ups when the window is narrow (shell.qml),
+// The selected wallpaper, as in variant D of the prototype: preview with the candidates next to it (seed of each
+// recipe marked), the colour category of the carousel for both, the mock-ups when the window is narrow (shell.qml),
 // and the full token table below.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -8,13 +8,13 @@ import QtQuick.Controls
 Flickable {
     id: v
     property var app
-    property bool mockups: false // the mock-ups of both Przepisy here, under the Kandydaci (narrow window)
+    property bool mockups: false // the mock-ups of both recipes here, under the candidates (narrow window)
     readonly property var it: app.it
     readonly property var res: it ? app.result(it.fileName) : null
     readonly property var trialRes: it ? app.result(it.fileName, app.trialFingerprint) : null
 
-    function bucket(r) {
-        return !r ? "liczenie…" : r.error ? "błąd matugena" : r.bucket;
+    function category(r) {
+        return !r ? "computing…" : r.error ? "matugen error" : r.category;
     }
 
     clip: true
@@ -57,34 +57,34 @@ Flickable {
                 Text {
                     width: parent.width
                     elide: Text.ElideMiddle
-                    text: v.it ? v.it.fileName + (v.it.fileName === v.app.current ? "  · bieżąca" : "") : ""
+                    text: v.it ? v.it.fileName + (v.it.fileName === v.app.current ? "  · current" : "") : ""
                     color: v.app.ui.text
                     font { family: v.app.ui.font; pixelSize: 16; bold: true }
                 }
                 Text {
                     width: parent.width
                     wrapMode: Text.Wrap
-                    readonly property bool moved: !!(v.res && v.trialRes && v.res.bucket && v.res.bucket !== v.trialRes.bucket)
-                    text: "Kategoria karuzeli: obecny " + v.bucket(v.res) + " · próbny " + v.bucket(v.trialRes)
-                          + (moved ? "   ← inna" : "")
+                    readonly property bool moved: !!(v.res && v.trialRes && v.res.category && v.res.category !== v.trialRes.category)
+                    text: "Colour category: current " + v.category(v.res) + " · trial " + v.category(v.trialRes)
+                          + (moved ? "   ← different" : "")
                     color: moved ? v.app.ui.trial : v.app.ui.dim
                     font { family: v.app.ui.font; pixelSize: 12 }
                 }
                 Repeater {
-                    // matugen error of either Przepis
-                    model: [["obecny", v.res], ["próbny", v.trialRes]].filter(x => x[1] && x[1].error)
+                    // matugen error of either recipe
+                    model: [["current", v.res], ["trial", v.trialRes]].filter(x => x[1] && x[1].error)
                     Text {
                         required property var modelData
                         width: parent.width
                         wrapMode: Text.Wrap
-                        text: "Błąd matugena (" + modelData[0] + "): " + modelData[1].error
+                        text: "matugen error (" + modelData[0] + "): " + modelData[1].error
                         color: v.app.ui.error
                         font { family: v.app.ui.font; pixelSize: 12 }
                     }
                 }
-                Text { text: "Kandydaci (od najbardziej dominującego)"; color: v.app.ui.dim; font { family: v.app.ui.font; pixelSize: 12 } }
+                Text { text: "Candidates (most dominant first)"; color: v.app.ui.dim; font { family: v.app.ui.font; pixelSize: 12 } }
                 Repeater {
-                    // Kandydaci depend on the thumbnail only: the same for both Przepisy
+                    // candidates depend on the thumbnail only: the same for both recipes
                     model: v.res && v.res.candidates ? v.res.candidates : v.trialRes && v.trialRes.candidates ? v.trialRes.candidates : []
                     Row {
                         id: k
@@ -101,9 +101,9 @@ Flickable {
                             width: info.width - 46
                             wrapMode: Text.Wrap
                             readonly property bool isTrial: !!(v.trialRes && k.modelData === v.trialRes.seed)
-                            text: "Kandydat " + (k.index + 1) + "  " + k.modelData
-                                  + (v.res && k.modelData === v.res.seed ? "   ← Seed obecny" : "")
-                                  + (isTrial ? "   ← Seed próbny" : "")
+                            text: "Candidate " + (k.index + 1) + "  " + k.modelData
+                                  + (v.res && k.modelData === v.res.seed ? "   ← current seed" : "")
+                                  + (isTrial ? "   ← trial seed" : "")
                             color: isTrial && !(v.res && k.modelData === v.res.seed) ? v.app.ui.trial : v.app.ui.text
                             font { family: "monospace"; pixelSize: 13 }
                         }

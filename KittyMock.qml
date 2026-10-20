@@ -63,10 +63,10 @@ Item {
                         [["ajmag@arch ", "green"], ["~/Projects ", "blue"], ["❯ ", "magenta"], ["git status", "fg"]],
                         [["On branch ", "fg"], ["ajmashell-wip", "cyan"]],
                         [["  modified:   ", "red"], ["wpapply.sh", "red"]],
-                        [["  new file:   ", "green"], ["przepis-palety.json", "green"]],
+                        [["  new file:   ", "green"], ["palette-recipe.json", "green"]],
                         [["ajmag@arch ", "green"], ["~/Projects ", "blue"], ["❯ ", "magenta"], ["ls", "fg"]],
                         [["hyprland/  ", "blue"], ["tools/  ", "blue"], ["check.sh  ", "green"], ["README.md", "fg"]],
-                        [["# komentarz, ", "brblack"], ["ostrzeżenie ", "yellow"], ["zaznaczony tekst", "sel"]],
+                        [["# comment, ", "brblack"], ["warning ", "yellow"], ["selected text", "sel"]],
                         [["ajmag@arch ", "green"], ["~/Projects ", "blue"], ["❯ ", "magenta"], [" ", "cursor"]]
                     ]
                     Row {
