@@ -10,6 +10,9 @@
 #       for recipes[i], the selected one first (the trial gets only the selected one until the user asks for all).
 #       Jobs run wallpaper by wallpaper in the order of the longest list. A new request replaces the queue of the
 #       previous one: jobs it no longer names are dropped, the rest follow the new order.
+#   {"type": "save", "recipe": {...}}
+#       write the recipe as the system Przepis (palette_recipe.save: strict validation, atomic, no commit), then in the
+#       background the carousel indexer and wpapply.sh on the current wallpaper (ticket 07). Saves run one at a time.
 # Helper -> window (stdout):
 #   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint",
 #    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]},   (palette_recipe.options())
@@ -19,6 +22,8 @@
 #   {"type": "result", "fingerprint", "fileName", "candidates": [hex], "seed": hex, "bucket", "colors": {token: hex}}
 #   {"type": "error", "fingerprint", "fileName", "message"}
 #   {"type": "progress", "fingerprint", "done": n, "total": n}   (per recipe; total = all wallpapers)
+#   {"type": "saved", "recipe": {...}, "fingerprint"} | {"type": "saved", "error": text}   (file written or not)
+#   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in ~/.cache/matugen-ajmashell-tool, so a
 # second start is instant. At most half the cores, like the indexer (the CPU is this machine's bottleneck).
@@ -41,6 +46,8 @@ CACHE = os.path.join(HOME, ".cache/matugen-ajmashell-tool/results")
 KITTY_TEMPLATE = os.path.join(HOME, ".config/matugen/templates/kitty-colors.conf")
 LOOKNFEEL = os.path.join(HOME, ".config/hypr/configs/looknfeel.lua")
 RULES = os.path.join(HOME, ".config/hypr/configs/rules.lua")
+INDEXER = os.path.join(DOTFILES_WALLPAPER, "indexer.py")
+WPAPPLY = os.path.join(HOME, ".config/hypr/scripts/wpapply.sh")
 WORKERS = max(1, (os.cpu_count() or 2) // 2)
 
 sys.dont_write_bytecode = True  # no __pycache__ in the dotfiles
@@ -239,6 +246,41 @@ class Queue:
                 self.running.discard((fingerprint, name))
 
 
+def run_step(cmd):
+    """None when the command succeeded, else the last line it printed on stderr."""
+    try:
+        r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=600)
+    except (OSError, subprocess.SubprocessError) as e:
+        return str(e)
+    if r.returncode == 0:
+        return None
+    lines = [re.sub(r"\x1b\[[0-9;]*m", "", ln).strip() for ln in r.stderr.splitlines()]
+    return next((ln for ln in reversed(lines) if ln), f"exit {r.returncode}")
+
+
+def save(recipe):
+    """Story 51-55: the trial becomes the system Przepis. The file first (the window takes it over as the Przepis
+    obecny at once), then the carousel index (Seeds and buckets of the new recipe, thumbnails kept) and wpapply.sh on
+    the current wallpaper, so the desktop shows the new colours. wpapply.sh would run the indexer itself for a stale
+    entry, but only for the current wallpaper's folder and without a report; here every step reports to the window."""
+    try:
+        valid = palette_recipe.save(recipe)
+    except (ValueError, OSError) as e:
+        send({"type": "saved", "error": str(e)})
+        return
+    send({"type": "saved", "recipe": valid, "fingerprint": palette_recipe.fingerprint(valid)})
+    send({"type": "apply", "stage": "indexer"})
+    err = run_step(["python3", INDEXER])
+    if err is None:
+        current = os.path.realpath(CURRENT) if os.path.exists(CURRENT) else None
+        if current is None:
+            err = f"{CURRENT}: brak bieżącej tapety"
+        else:
+            send({"type": "apply", "stage": "wallpaper"})
+            err = run_step([WPAPPLY, current])
+    send({"type": "apply", "stage": "error", "message": err} if err else {"type": "apply", "stage": "done"})
+
+
 def main():
     os.makedirs(CACHE, exist_ok=True)
     items = load_items()
@@ -252,6 +294,7 @@ def main():
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
         pool.submit(queue.work)
+    saver = ThreadPoolExecutor(max_workers=1)  # in the background, one save after another
     for line in sys.stdin:
         try:
             msg = json.loads(line)
@@ -261,6 +304,8 @@ def main():
             recipes = msg.get("recipes") or [None]
             orders = msg.get("orders") or []
             queue.request([validated(r) for r in recipes], [*orders, *[[]] * (len(recipes) - len(orders))])
+        elif msg.get("type") == "save":
+            saver.submit(save, msg.get("recipe"))
     os._exit(0)  # window closed: drop the queue, do not wait for running matugen calls
 
 

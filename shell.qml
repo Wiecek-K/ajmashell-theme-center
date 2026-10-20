@@ -37,6 +37,14 @@ ShellRoot {
         property int rev: 0
         property bool pending: false
         property string helperError: ""
+        // Saving the trial as the system Przepis (ticket 07): saving = the file is being written; applyStage = the
+        // background steps after it ("indexer", "wallpaper", "done", "error"), shown in the panel
+        property bool saving: false
+        property string saveError: ""
+        property string applyStage: ""
+        property string applyError: ""
+        readonly property bool applying: applyStage === "indexer" || applyStage === "wallpaper"
+        readonly property bool trialEdited: JSON.stringify(trial) !== JSON.stringify(recipe)
         property string copied: ""
 
         readonly property bool trialDiffers: fingerprint !== trialFingerprint
@@ -116,6 +124,16 @@ ShellRoot {
             debounce.restart();
         }
 
+        // The trial becomes the system Przepis; the helper writes it through palette_recipe.save and answers "saved"
+        function saveTrial() {
+            if (saving || applying || !trialEdited) return;
+            saving = true;
+            saveError = "";
+            applyStage = "";
+            applyError = "";
+            helper.write(JSON.stringify({ type: "save", recipe: trial }) + "\n");
+        }
+
         function restore() {
             trial = JSON.parse(JSON.stringify(recipe));
             trialAll = false;
@@ -147,6 +165,20 @@ ShellRoot {
                     r[m.fileName] = m;
                 }
                 pending = true;
+            } else if (m.type === "saved") {
+                saving = false;
+                if (m.error) {
+                    saveError = m.error;
+                } else {
+                    // story 54: the saved recipe is the Przepis obecny now, so the differences and the summary go;
+                    // the trial stays as it is (equal to it, unless a control moved after the click)
+                    recipe = m.recipe;
+                    fingerprint = m.fingerprint;
+                    request();
+                }
+            } else if (m.type === "apply") {
+                applyStage = m.stage;
+                applyError = m.message || "";
             } else if (m.type === "progress") {
                 done[m.fingerprint] = m.done;
                 pending = true;

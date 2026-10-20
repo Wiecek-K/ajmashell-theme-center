@@ -1,6 +1,7 @@
 // Right panel (variant D of the prototype): controls of the Przepis próbny next to the Przepis obecny (the system
-// file), "przywróć obecny", folder progress for both recipes, the summary of what the trial changes, the last
-// copied hex. Lists and ranges of the controls come from the helper (palette_recipe.options()), never copied here.
+// file), "przywróć obecny", "zapisz jako Przepis systemu" with the steps after it, folder progress for both recipes,
+// the summary of what the trial changes, the last copied hex. Lists and ranges of the controls come from the helper
+// (palette_recipe.options()), never copied here.
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -71,7 +72,7 @@ Rectangle {
                     app: p.app
                     label: "przywróć obecny"
                     tone: p.app.ui.accent
-                    enabled: p.app.trialDiffers || JSON.stringify(p.t) !== JSON.stringify(p.r)
+                    enabled: p.app.trialDiffers || p.app.trialEdited
                     onClicked: p.app.restore()
                 }
             }
@@ -140,6 +141,30 @@ Rectangle {
                 text: "Niebieska ramka i kreska: wartość Przepisu obecnego."
                 color: p.app.ui.dim
                 font { family: p.app.ui.font; pixelSize: 11 }
+            }
+
+            // story 51-55: one button, no commit; the steps after the file run in the helper's background
+            Chip {
+                app: p.app
+                label: p.app.saving ? "zapisuję…" : "zapisz jako Przepis systemu"
+                tone: p.app.ui.trial
+                selected: p.app.trialEdited && !p.app.saving && !p.app.applying
+                enabled: selected
+                onClicked: p.app.saveTrial()
+            }
+            Text {
+                readonly property var stages: ({ indexer: "Zapisano plik Przepisu. Przeliczam indeks karuzeli…",
+                                                 wallpaper: "Nakładam nowy Przepis na bieżącą tapetę…",
+                                                 done: "Zapisano i nałożono na pulpit. Bez commita w dotfiles.",
+                                                 error: "Plik zapisany, ale nałożenie się nie udało: " })
+                visible: text !== ""
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: p.app.saveError ? "Nie zapisano: " + p.app.saveError
+                      : p.app.applyStage ? stages[p.app.applyStage] + (p.app.applyStage === "error" ? p.app.applyError : "") : ""
+                color: p.app.saveError || p.app.applyStage === "error" ? p.app.ui.error
+                       : p.app.applying ? p.app.ui.text : p.app.ui.dim
+                font { family: p.app.ui.font; pixelSize: 12 }
             }
 
             Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
