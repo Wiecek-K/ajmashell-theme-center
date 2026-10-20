@@ -57,7 +57,7 @@ Flickable {
                 Text {
                     width: parent.width
                     elide: Text.ElideMiddle
-                    text: v.it ? v.it.fileName + (v.it.fileName === v.app.current ? "  · current" : "") : ""
+                    text: v.it ? v.it.fileName + (v.it.fileName === v.app.current ? "  · on desktop" : "") : ""
                     color: v.app.ui.text
                     font { family: v.app.ui.font; pixelSize: 16; bold: true }
                 }

@@ -264,8 +264,9 @@ def run_step(cmd):
 def save(recipe):
     """Story 51-55: the trial becomes the system palette recipe. The file first (the window takes it over as the
     current recipe at once), then the carousel index (seeds and colour categories of the new recipe, thumbnails
-    kept) and wpapply.sh on the current wallpaper, so the desktop shows the new colours. wpapply.sh would run the indexer itself for a stale
-    entry, but only for the current wallpaper's folder and without a report; here every step reports to the window."""
+    kept) and wpapply.sh on the current wallpaper, so the desktop shows the new colours. wpapply.sh would run the
+    indexer itself for a stale entry, but only for the current wallpaper's folder and without a report; here every
+    step reports to the window."""
     try:
         valid = palette_recipe.save(recipe)
         fingerprint = palette_recipe.fingerprint(valid)

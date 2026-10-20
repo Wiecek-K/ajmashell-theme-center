@@ -38,8 +38,8 @@ ShellRoot {
         property int rev: 0
         property bool pending: false
         property string helperError: ""
-        // Saving the trial as the system palette recipe (ticket 07): saving = the file is being written; applyStage = the
-        // background steps after it ("indexer", "wallpaper", "done", "error"), shown in the panel
+        // Saving the trial as the system palette recipe (ticket 07): saving = the file is being written;
+        // applyStage = the background steps after it ("indexer", "wallpaper", "done", "error"), shown in the panel
         property bool saving: false
         property string saveError: ""
         property string applyStage: ""
@@ -125,7 +125,8 @@ ShellRoot {
             debounce.restart();
         }
 
-        // The trial becomes the system palette recipe; the helper writes it through palette_recipe.save and answers "saved"
+        // The trial becomes the system palette recipe; the helper writes it through palette_recipe.save and answers
+        // "saved"
         function saveTrial() {
             if (saving || applying || !trialEdited) return;
             saving = true;

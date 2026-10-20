@@ -1,5 +1,5 @@
 // Strip of all carousel wallpapers on the left (thumbnails from the carousel cache), as in variant D of the
-// prototype. Arrows move the selection (shell.qml); a click selects. Marks: selection frame, "current" = the
+// prototype. Arrows move the selection (shell.qml); a click selects. Marks: selection frame, "on desktop" = the
 // system's current wallpaper, seed dot (a second one when the trial picks another seed), error badge, and what the
 // trial recipe changes there ("seed" or "palette").
 pragma ComponentBehavior: Bound
@@ -55,7 +55,7 @@ ListView {
             anchors { left: parent.left; top: parent.top; margins: 8 }
             width: cur.implicitWidth + 10; height: 16; radius: 8
             color: list.app.ui.accent
-            Text { id: cur; anchors.centerIn: parent; text: "current"; color: "#101010"; font { family: list.app.ui.font; pixelSize: 10; bold: true } }
+            Text { id: cur; anchors.centerIn: parent; text: "on desktop"; color: "#101010"; font { family: list.app.ui.font; pixelSize: 10; bold: true } }
         }
         Row {
             anchors { right: parent.right; bottom: parent.bottom; margins: 8 }
