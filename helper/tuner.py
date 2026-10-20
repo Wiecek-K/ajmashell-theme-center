@@ -5,10 +5,11 @@
 # dotfiles by path, never copied, so the tool shows exactly what wpapply.sh and the carousel indexer would do.
 #
 # Window -> helper (stdin):
-#   {"type": "compute", "recipes": [{...} | null, ...], "order": [fileName, ...]}
-#       recipes = Przepis obecny and Przepis próbny (null = the system Przepis file); order = wallpapers to compute,
-#       the selected one first. Jobs run wallpaper by wallpaper, both recipes for each. A new request replaces the
-#       queue of the previous one: jobs of recipes it no longer names are dropped, the rest follow the new order.
+#   {"type": "compute", "recipes": [{...} | null, ...], "orders": [[fileName, ...], ...]}
+#       recipes = Przepis obecny and Przepis próbny (null = the system Przepis file); orders[i] = wallpapers to compute
+#       for recipes[i], the selected one first (the trial gets only the selected one until the user asks for all).
+#       Jobs run wallpaper by wallpaper in the order of the longest list. A new request replaces the queue of the
+#       previous one: jobs it no longer names are dropped, the rest follow the new order.
 # Helper -> window (stdout):
 #   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint",
 #    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]}}   (palette_recipe.options())
@@ -141,11 +142,13 @@ class Queue:
         self.done = {}      # fingerprint -> fileNames with a result or an error
         self.running = set()
 
-    def request(self, recipes, order):
+    def request(self, recipes, orders):
         fingerprints = [palette_recipe.fingerprint(r) for r in recipes]
         send({"type": "accepted", "recipes": recipes, "fingerprints": fingerprints})
-        names = [n for n in order if n in self.by_name]
-        unique = list(dict.fromkeys(fingerprints))
+        wanted = {}  # fingerprint -> fileNames asked for (the same recipe twice: the union)
+        for fp, order in zip(fingerprints, orders):
+            wanted.setdefault(fp, set()).update(n for n in order if n in self.by_name)
+        names = [n for n in max(orders, key=len, default=[]) if n in self.by_name]
         for fp, recipe in zip(fingerprints, recipes):
             if fp in self.done:
                 continue
@@ -158,8 +161,8 @@ class Queue:
             if not self.by_name:
                 send({"type": "progress", "fingerprint": fp, "done": 0, "total": 0})
         with self.cond:
-            self.waiting = [(fp, n) for n in names for fp in unique
-                            if n not in self.done[fp] and (fp, n) not in self.running]
+            self.waiting = [(fp, n) for n in names for fp in wanted
+                            if n in wanted[fp] and n not in self.done[fp] and (fp, n) not in self.running]
             self.cond.notify_all()
 
     def finish(self, fingerprint, name, msg):
@@ -214,7 +217,9 @@ def main():
         except ValueError:
             continue
         if msg.get("type") == "compute":
-            queue.request([validated(r) for r in msg.get("recipes") or [None]], msg.get("order") or [])
+            recipes = msg.get("recipes") or [None]
+            orders = msg.get("orders") or []
+            queue.request([validated(r) for r in recipes], [*orders, *[[]] * (len(recipes) - len(orders))])
     os._exit(0)  # window closed: drop the queue, do not wait for running matugen calls
 
 

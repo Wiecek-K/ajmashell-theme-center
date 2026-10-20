@@ -23,6 +23,9 @@ ShellRoot {
         property string fingerprint: ""
         property var trial: null        // Przepis próbny: starts as a copy of the current one, changed by the controls
         property string trialFingerprint: ""
+        // The trial is computed for the selected wallpaper only; the rest of the folder after the button
+        // "przelicz wszystkie" (user, 2026-10-20). A new trial value goes back to the selected one only.
+        property bool trialAll: false
         property var options: null      // palette_recipe.options(): rules, schemes, number ranges
         // results[fingerprint][fileName] = {seed, candidates, bucket, colors, key} or {error}; done[fingerprint] = n.
         // Messages write them at once, rev follows at most every 80 ms (pending): one rebind of the strip and the
@@ -84,14 +87,22 @@ ShellRoot {
 
         function request() {
             if (!items.length) return;
-            helper.write(JSON.stringify({ type: "compute", recipes: [recipe, trial], order: order() }) + "\n");
+            const all = order();
+            helper.write(JSON.stringify({ type: "compute", recipes: [recipe, trial],
+                                          orders: [all, trialAll ? all : all.slice(0, 1)] }) + "\n");
         }
 
         function select(i) {
             if (i < 0 || i >= items.length || i === sel) return;
             sel = i;
-            // same recipes: the helper only moves the selected one to the front
+            // same recipes: the helper moves the selected one to the front (and adds it to the trial's list)
             if (doneOf(fingerprint) < total || doneOf(trialFingerprint) < total) request();
+        }
+
+        function computeAll() {
+            trialAll = true;
+            debounce.stop();
+            request();
         }
 
         // A control changed one field of the trial: the request waits for the control to settle (debounce).
@@ -99,11 +110,13 @@ ShellRoot {
             const t = JSON.parse(JSON.stringify(trial));
             t[section][key] = value;
             trial = t;
+            trialAll = false;
             debounce.restart();
         }
 
         function restore() {
             trial = JSON.parse(JSON.stringify(recipe));
+            trialAll = false;
             debounce.stop();
             request();
         }

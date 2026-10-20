@@ -155,6 +155,16 @@ Rectangle {
                     font { family: "monospace"; pixelSize: 13 }
                 }
             }
+            Chip {
+                // the rest of the folder for the trial, on demand (user, 2026-10-20): moving a control computes
+                // only the selected wallpaper
+                visible: p.app.trialDiffers && p.app.doneOf(p.app.trialFingerprint) < p.app.total
+                app: p.app
+                label: p.app.trialAll ? "liczę pozostałe tapety…" : "przelicz wszystkie tapety ("
+                       + (p.app.total - p.app.doneOf(p.app.trialFingerprint)) + " brakuje)"
+                selected: p.app.trialAll
+                onClicked: if (!p.app.trialAll) p.app.computeAll()
+            }
             Column {
                 id: sum
                 width: parent.width

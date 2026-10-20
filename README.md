@@ -12,7 +12,8 @@ Pokazuje dla każdej tapety karuzeli paletę, którą da system według Przepisu
 - Klawisze: `↑` `↓` (i `←` `→`) zmieniają tapetę, `Home` / `End` pierwsza / ostatnia. Klik w próbkę kopiuje hex.
 - Kontrolki (panel z prawej) zmieniają Przepis próbny: reguła Seeda, schemat, kontrast, jasność palety ciemnej.
   Listy i zakresy z `palette_recipe.options()`; jasność ciemnej nie ma dolnej granicy w matugenie (−∞), suwak
-  zaczyna się od −1. Żądanie idzie do pomocnika po 300 ms spokoju (debounce). „przywróć obecny” wraca do pliku
+  zaczyna się od −1. Żądanie idzie do pomocnika po 300 ms spokoju (debounce). Próba liczy się tylko dla wybranej
+  tapety (i każdej, którą potem wybierzesz); resztę folderu liczy przycisk „przelicz wszystkie tapety”. „przywróć obecny” wraca do pliku
   Przepisu systemu. Taśma: „Seed” / „paleta” = co próba zmienia na tej tapecie; drugi punkt = Seed próbny.
 
 ## Budowa
