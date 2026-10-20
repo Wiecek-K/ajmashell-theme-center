@@ -64,7 +64,7 @@ Column {
                     visible: p.kittyOff
                     width: col.width
                     wrapMode: Text.Wrap
-                    text: "kitty mock-up off: no colour lines in the kitty template (see Settings)."
+                    text: "kitty mock-up off: the kitty template is missing or has no colour lines (see Settings)."
                     color: p.app.ui.dim
                     font { family: p.app.ui.font; pixelSize: 12 }
                 }

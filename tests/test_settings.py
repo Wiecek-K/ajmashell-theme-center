@@ -91,13 +91,15 @@ class Status(unittest.TestCase):
                 open(os.path.join(shell, "wallpaper", name), "w").close()
             index = os.path.join(d, "index.json")
             open(index, "w").close()
-            paths = dict(settings.DEFAULTS, ajmashellDir=shell, wallpaperIndex=index,
-                         recipeFile=os.path.join(d, "missing.json"))
+            paths = settings.resolve({"ajmashellDir": shell, "wallpaperIndex": index,
+                                      "recipeFile": os.path.join(d, "missing.json")})
             st = {s["key"]: s for s in settings.status(paths)}
             self.assertTrue(st["ajmashellDir"]["found"])
             self.assertTrue(st["wallpaperIndex"]["found"])
             self.assertFalse(st["recipeFile"]["found"])
             self.assertEqual(st["recipeFile"]["default"], "~/.config/matugen/przepis-palety.json")
+            self.assertEqual(st["ajmashellDir"]["own"], shell)
+            self.assertEqual(st["wpapply"]["own"], "")  # the default: an empty field
             self.assertEqual([s["key"] for s in settings.status(paths)], list(settings.DEFAULTS))
 
     def test_a_directory_without_the_recipe_module_is_missing(self):

@@ -31,7 +31,7 @@ Rectangle {
                 wrapMode: Text.Wrap
                 text: "Paths the tool reads from Ajmashell and the system. The defaults are those of an Ajmashell "
                       + "install from the dotfiles; change a path only if yours lives elsewhere. An empty field means "
-                      + "the default. Saved in ~/.config/ajmashell-theme-center/settings.json."
+                      + "the default. Saved in " + p.app.settingsFile + "."
                 color: p.app.ui.dim
                 font { family: p.app.ui.font; pixelSize: 12 }
             }
@@ -54,6 +54,7 @@ Rectangle {
                     readonly property string key: modelData.key
                     // status of the draft once the helper checked it (same order), else of the path in use
                     readonly property var st: p.app.checked ? p.app.checked[index] : modelData
+                    readonly property string typed: p.app.draft[row.key] ?? ""
                     width: col.width
                     spacing: 4
 
@@ -72,7 +73,7 @@ Rectangle {
                     }
                     TextField {
                         width: row.width
-                        text: p.app.draft[row.key] ?? ""
+                        text: row.typed
                         placeholderText: row.modelData.default
                         selectByMouse: true
                         font { family: "monospace"; pixelSize: 13 }
@@ -94,7 +95,7 @@ Rectangle {
                             font { family: "monospace"; pixelSize: 11 }
                         }
                         Chip {
-                            visible: (p.app.draft[row.key] ?? "") !== ""
+                            visible: row.typed !== ""
                             app: p.app
                             label: "use default"
                             tone: p.app.ui.accent
@@ -118,7 +119,7 @@ Rectangle {
                     app: p.app
                     label: p.app.restarting ? "applying…" : "apply"
                     tone: p.app.ui.accent
-                    selected: p.app.draftEdited && !p.app.restarting && !p.app.saving && !p.app.applying
+                    selected: p.app.canApply
                     enabled: selected
                     onClicked: p.app.applySettings()
                 }
@@ -133,10 +134,7 @@ Rectangle {
                     app: p.app
                     label: "close"
                     tone: p.app.ui.accent
-                    onClicked: {
-                        p.app.discardSettings();
-                        p.app.settingsOpen = false;
-                    }
+                    onClicked: p.app.toggleSettings()
                 }
             }
             Text {

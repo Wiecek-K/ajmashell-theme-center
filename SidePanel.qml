@@ -40,7 +40,7 @@ Rectangle {
                 tone: p.app.ui.accent
                 selected: p.app.settingsOpen
                 border.color: missing || p.app.settingsWarning ? p.app.ui.error : selected ? tone : p.app.ui.line
-                onClicked: p.app.settingsOpen = !p.app.settingsOpen
+                onClicked: p.app.toggleSettings()
             }
             Repeater {
                 model: p.app.settingsWarning ? [p.app.settingsWarning, ...p.app.problems] : p.app.problems

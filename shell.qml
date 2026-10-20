@@ -52,6 +52,7 @@ ShellRoot {
         // stops (shown in the panel and, without wallpapers, in the middle); the panel edits draft {key: text}, the
         // helper checks it ("checked" = status of the draft) and, on apply, saves it and restarts (restarting)
         property var settings: []
+        property string settingsFile: ""
         property string settingsWarning: ""
         property var problems: []
         property bool settingsOpen: false
@@ -59,11 +60,13 @@ ShellRoot {
         property var checked: null
         property bool restarting: false
         property string settingsError: ""
+        // a field holds the path only when it is not the default (s.own); empty = the default
         readonly property bool draftEdited: {
             for (const s of settings)
-                if ((draft[s.key] ?? s.value) !== s.value) return true;
+                if ((draft[s.key] ?? "") !== s.own) return true;
             return false;
         }
+        readonly property bool canApply: draftEdited && !restarting && !saving && !applying
 
         readonly property bool trialDiffers: fingerprint !== trialFingerprint
         readonly property int total: items.length
@@ -114,7 +117,7 @@ ShellRoot {
         }
 
         function request() {
-            if (!items.length || !recipe) return;
+            if (!items.length || !recipe || restarting) return;
             const all = order();
             helper.write(JSON.stringify({ type: "compute", recipes: [recipe, trial],
                                           orders: [all, trialAll ? all : all.slice(0, 1)] }) + "\n");
@@ -169,7 +172,8 @@ ShellRoot {
         // The helper saves the settings and starts over in the same process; a new "ready" resets the window.
         // Not while a save runs: the restart would cut its steps off.
         function applySettings() {
-            if (restarting || saving || applying || !draftEdited) return;
+            if (!canApply) return;
+            debounce.stop();
             restarting = true;
             checkDebounce.stop();
             helper.write(JSON.stringify({ type: "settings", paths: draft }) + "\n");
@@ -177,11 +181,17 @@ ShellRoot {
 
         function discardSettings() {
             const d = {};
-            for (const s of settings) d[s.key] = s.value;
+            for (const s of settings) d[s.key] = s.own;
             draft = d;
             checked = null;
             settingsError = "";
             checkDebounce.stop();
+        }
+
+        // closing the panel (button or Ctrl+,) drops what was typed and not applied
+        function toggleSettings() {
+            if (settingsOpen) discardSettings();
+            settingsOpen = !settingsOpen;
         }
 
         function restore() {
@@ -193,14 +203,22 @@ ShellRoot {
 
         function onMessage(m) {
             if (m.type === "ready") {
-                // also after a settings change: everything computed so far belonged to the old paths
+                // also after a settings change: everything computed so far belonged to the old paths, and the
+                // trial starts again from the (maybe other) recipe file; the selected wallpaper stays if it is there
+                const before = it ? it.fileName : "";
                 results = {};
                 done = {};
+                pending = false;
                 rev++;
                 trialAll = false;
                 helperError = "";
+                saving = false;
+                saveError = "";
+                applyStage = "";
+                applyError = "";
                 restarting = false;
                 settings = m.settings;
+                settingsFile = m.settingsFile;
                 settingsWarning = m.settingsWarning || "";
                 problems = m.problems;
                 discardSettings();
@@ -212,7 +230,8 @@ ShellRoot {
                 look = m.look;
                 current = m.current || "";
                 items = m.items;
-                sel = Math.max(0, items.findIndex(x => x.fileName === current));
+                const kept = items.findIndex(x => x.fileName === before);
+                sel = kept >= 0 ? kept : Math.max(0, items.findIndex(x => x.fileName === current));
                 request();
             } else if (m.type === "accepted") {
                 fingerprint = m.fingerprints[0];
@@ -332,7 +351,7 @@ ShellRoot {
             Keys.onLeftPressed: app.select(app.sel - 1)
             Keys.onRightPressed: app.select(app.sel + 1)
             Keys.onPressed: e => {
-                if (e.key === Qt.Key_Comma && e.modifiers & Qt.ControlModifier) app.settingsOpen = !app.settingsOpen;
+                if (e.key === Qt.Key_Comma && e.modifiers & Qt.ControlModifier) app.toggleSettings();
                 else if (e.key === Qt.Key_Home) app.select(0);
                 else if (e.key === Qt.Key_End) app.select(app.items.length - 1);
             }

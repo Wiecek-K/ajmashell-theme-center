@@ -114,8 +114,9 @@ def save(paths, file=None):
 
 
 def status(paths):
-    """For the Settings panel, in the order of DEFAULTS: [{key, label, value, default, found, problem}], where
-    problem is the text the window shows for a missing path (None when found)."""
+    """For the Settings panel, in the order of DEFAULTS: [{key, label, value, own, default, found, problem}]:
+    own = the path when it is not the default, else "" (the field shows it; empty = the default), problem = the text
+    the window shows for a missing path (None when found)."""
     out = []
     for key, default in DEFAULTS.items():
         value = paths[key]
@@ -129,6 +130,7 @@ def status(paths):
             problem = f"{value} is not executable: {EFFECTS[key]}"
         else:
             problem = None
-        out.append({"key": key, "label": LABELS[key], "value": value, "default": default,
+        out.append({"key": key, "label": LABELS[key], "value": value,
+                    "own": value if value != _expand(default) else "", "default": default,
                     "found": problem is None, "problem": problem})
     return out

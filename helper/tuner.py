@@ -29,7 +29,7 @@
 #    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]},
 #       (system_look(): what the mock-ups read from the system's own files, see there)
 #    "settings": [{key, label, value, default, found, problem}],   (settings.status())
-#    "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
+#    "settingsFile": path, "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
 #    "problems": [text]}   (each missing path with what it stops; shown in the window)
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
 #   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
@@ -41,7 +41,8 @@
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in $XDG_CACHE_HOME/ajmashell-theme-center
-# (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this machine's bottleneck).
+# (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this
+# machine's bottleneck).
 
 import hashlib
 import importlib
@@ -64,7 +65,7 @@ NO_MODULE = "the Ajmashell directory has no palette recipe module (see Settings)
 
 PATHS = {}              # settings.load(): key -> path
 palette_recipe = None   # <ajmashellDir>/wallpaper/palette_recipe.py, imported in main()
-indexer = None          # <ajmashellDir>/wallpaper/indexer.py (color_bucket: the carousel's thresholds = colour category)
+indexer = None          # <ajmashellDir>/wallpaper/indexer.py (color_bucket: carousel thresholds = colour category)
 
 out_lock = threading.Lock()
 
@@ -103,7 +104,8 @@ def system_look():
     - border: the tokens and angle of `active_border` in Hyprland's looknfeel.lua,
     - kittyOpacity: the active opacity of the kitty window rule in rules.lua.
     A line that cannot be recognised lands in `problems` (shown in the window); the mock-up then uses its fallback
-    from Mockups.js. A missing file is no problem here: settings.status() reports it with what it stops. The Ajmashell colours (Bar, popup) are QML bindings and stay mapped in Mockups.js."""
+    from Mockups.js. A missing file is no problem here: settings.status() reports it with what it stops. The
+    Ajmashell colours (Bar, popup) are QML bindings and stay mapped in Mockups.js."""
     look = {"kitty": {}, "border": [], "borderAngle": 0, "kittyOpacity": None, "problems": []}
 
     def read(key):
@@ -351,7 +353,8 @@ def main():
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
           "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe) if recipe else None,
           "options": palette_recipe.options() if palette_recipe else None, "look": system_look(),
-          "settings": status, "settingsWarning": warning, "problems": problems})
+          "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
+          "problems": problems})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
