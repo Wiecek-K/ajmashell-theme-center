@@ -84,7 +84,7 @@ the mock-ups. The Ajmashell roles (Bar islands, control centre) are copied by ha
 of `Theme.qml`, fix them there.
 
 The palette recipe file is no setting: the tool reads and saves the file the recipe module names
-(`DEFAULT_PATH` in `palette_recipe.py`, today `~/.config/matugen/przepis-palety.json`), the same file `indexer.py` and
+(`DEFAULT_PATH` in `palette_recipe.py`, today `~/.config/matugen/palette-recipe.json`), the same file `indexer.py` and
 `wpapply.sh` read. Without it the window says so and shows the recipe's starting values; a save creates it.
 
 The window rule `theme-center-opaque` (class `ajmashell-theme-center`, `opacity 1.0 override`) lives in the dotfiles
