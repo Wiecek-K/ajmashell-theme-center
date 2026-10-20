@@ -142,6 +142,8 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 | `install.sh` | install and uninstall, see above |
 | `ajmashell-theme-center.desktop` | the launcher entry `install.sh` installs |
 | `tests/` | helper tests, `tests/run.sh` |
+| `LICENSE`, `SOURCES.md` | the license (AGPL-3.0-or-later) and where the code and ideas come from |
+| `docs/screenshot.jpg` | the screenshot at the top of this README |
 
 The protocol (JSON, one message per line) is described in the header of `helper/tuner.py`.
 Result cache: `~/.cache/ajmashell-theme-center/results` (`$XDG_CACHE_HOME` if set) (key: wallpaper path, mtime, size,
