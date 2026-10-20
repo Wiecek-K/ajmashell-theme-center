@@ -3,8 +3,10 @@
 # system would give each carousel wallpaper for a given palette recipe. Long-lived; talks to the QML window by JSON
 # messages, one per line. The recipe logic (validation, matugen flags, fingerprint) and the colour categories are
 # imported from the Ajmashell install by path, never copied, so the tool shows exactly what wpapply.sh and the
-# carousel indexer would do. Every path comes from the settings (settings.py, ticket 09); a missing one is a message
-# in the window, never a crash: without the Ajmashell directory nothing is computed or saved, the rest still starts.
+# carousel indexer would do. Every path comes from the settings (settings.py, ticket 09), except the palette recipe
+# file: the module's own path (palette_recipe.DEFAULT_PATH), the one wpapply.sh and the indexer read. A missing path
+# is a message in the window, never a crash: without the Ajmashell directory nothing is computed or saved, the rest
+# still starts.
 #
 # Window -> helper (stdin):
 #   {"type": "compute", "recipes": [{...} | null, ...], "orders": [[fileName, ...], ...]}
@@ -88,7 +90,7 @@ def matugen(args):
 def validated(recipe):
     """The recipe as the system would read it: through palette_recipe.load, so validation stays in one place."""
     if recipe is None:
-        return palette_recipe.load(PATHS["recipeFile"])
+        return palette_recipe.load()
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump(recipe, f)
     try:
@@ -290,7 +292,7 @@ def save(recipe):
         send({"type": "saved", "error": NO_MODULE})
         return
     try:
-        valid = palette_recipe.save(recipe, PATHS["recipeFile"])
+        valid = palette_recipe.save(recipe)
         fingerprint = palette_recipe.fingerprint(valid)
     except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for "saved" forever)
         send({"type": "saved", "error": str(e) or type(e).__name__})
@@ -347,7 +349,10 @@ def main():
     os.makedirs(CACHE, exist_ok=True)
     items = load_items()
     current = current_wallpaper()
-    recipe = palette_recipe.load(PATHS["recipeFile"]) if palette_recipe else None
+    recipe = palette_recipe.load() if palette_recipe else None
+    if palette_recipe and not os.path.isfile(palette_recipe.DEFAULT_PATH):
+        problems.append(f"{palette_recipe.DEFAULT_PATH} not found: the palette recipe shows its starting values; "
+                        "a save creates the file")
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),

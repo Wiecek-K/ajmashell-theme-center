@@ -71,7 +71,6 @@ field. While you type, each field shows "found" or "missing".
 | Setting | Default | Without it |
 |---|---|---|
 | Ajmashell directory | `~/.config/quickshell/ajmashell` | needs `wallpaper/palette_recipe.py` (`load`, `save`, `seed_flags`, `palette_flags`, `fingerprint`, `options`) and `wallpaper/indexer.py` (`color_bucket`, the colour category; run after a save). Without them nothing is computed or saved |
-| Palette recipe file | `~/.config/matugen/przepis-palety.json` | the starting values of the recipe are shown; a save creates the file. Renamed to `palette-recipe.json` in ticket 10 |
 | Carousel wallpaper index | `~/.cache/ajmashell/wallpapers/index.json` | no wallpapers: open the wallpaper carousel (Super + W) once to build it |
 | Current wallpaper link | `~/.config/hypr/current_wallpaper` | no wallpaper marked "on desktop"; a save cannot apply the palette |
 | kitty colour template | `~/.config/matugen/templates/kitty-colors.conf` | the kitty mock-up is off (lines `key {{ colors.TOKEN.default.hex }}`) |
@@ -84,8 +83,9 @@ that is there but not recognised (template without colour lines, `active_border`
 the mock-ups. The Ajmashell roles (Bar islands, control centre) are copied by hand into `Mockups.js`: after a change
 of `Theme.qml`, fix them there.
 
-The palette recipe file setting tells the tool where to read and save the recipe. Ajmashell itself (`indexer.py`,
-`wpapply.sh`) reads the path written in its `palette_recipe.py`, so set both to the same file.
+The palette recipe file is no setting: the tool reads and saves the file the recipe module names
+(`DEFAULT_PATH` in `palette_recipe.py`, today `~/.config/matugen/przepis-palety.json`), the same file `indexer.py` and
+`wpapply.sh` read. Without it the window says so and shows the recipe's starting values; a save creates it.
 
 The window rule `theme-center-opaque` (class `ajmashell-theme-center`, `opacity 1.0 override`) lives in the dotfiles
 (`~/.config/hypr/configs/rules.lua`); without it the window is as transparent as other windows.

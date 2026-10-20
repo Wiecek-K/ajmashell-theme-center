@@ -1,6 +1,8 @@
 # Settings of Ajmashell Theme Center (faza E ticket 09): every path the tool needs from the Ajmashell install and the
 # system, with its default in one place (DEFAULTS, the paths of the dotfiles), so a user with Ajmashell elsewhere only
-# sets their own. The file holds only the paths that differ from the default:
+# sets their own. The palette recipe file is no setting: its path is the recipe module's own
+# (palette_recipe.DEFAULT_PATH), so the tool and Ajmashell always use the same file. The file holds only the paths
+# that differ from the default:
 # $XDG_CONFIG_HOME/ajmashell-theme-center/settings.json (default ~/.config/...). No file = all defaults.
 
 import json
@@ -9,7 +11,6 @@ import os
 # key -> default ("~" for the home directory, shown as it is in the window)
 DEFAULTS = {
     "ajmashellDir": "~/.config/quickshell/ajmashell",   # wallpaper/palette_recipe.py, wallpaper/indexer.py
-    "recipeFile": "~/.config/matugen/przepis-palety.json",
     "wallpaperIndex": "~/.cache/ajmashell/wallpapers/index.json",
     "currentWallpaper": "~/.config/hypr/current_wallpaper",
     "kittyTemplate": "~/.config/matugen/templates/kitty-colors.conf",
@@ -20,7 +21,6 @@ DEFAULTS = {
 
 LABELS = {
     "ajmashellDir": "Ajmashell directory",
-    "recipeFile": "Palette recipe file",
     "wallpaperIndex": "Carousel wallpaper index",
     "currentWallpaper": "Current wallpaper link",
     "kittyTemplate": "kitty colour template",
@@ -31,7 +31,6 @@ LABELS = {
 
 # What stops working while the path is missing (shown in the window with the path)
 EFFECTS = {
-    "recipeFile": "the palette recipe shows its starting values; a save creates the file",
     "wallpaperIndex": "no wallpapers. Open the wallpaper carousel (Super + W) once to build the index",
     "currentWallpaper": "no wallpaper is marked as on desktop, and a save cannot apply the palette",
     "kittyTemplate": "the kitty mock-up is off",

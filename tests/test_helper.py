@@ -1,11 +1,13 @@
 # Tests of the helper's protocol (helper/tuner.py, JSON lines on stdin/stdout), run as the window runs it.
-# Everything lives in a temporary directory: settings, cache, palette recipe file, wallpaper index and a stand-in
-# Ajmashell directory with a copy of the real palette_recipe.py (the recipe logic is Ajmashell's, never copied into
-# this repo) and a stub indexer.py. Nothing here calls matugen: the index is empty, so no palette is computed.
+# Everything lives in a temporary directory: settings, cache, palette recipe file, wallpaper index and stand-in
+# Ajmashell directories, each with a copy of the real palette_recipe.py (the recipe logic is Ajmashell's, never copied
+# into this repo) whose DEFAULT_PATH points to a file in the temporary directory, and a stub indexer.py. Nothing here
+# calls matugen: the index is empty, so no palette is computed.
 # The real palette_recipe.py comes from $AJMASHELL_DIR or ~/.config/quickshell/ajmashell; without it the tests skip.
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -33,16 +35,12 @@ VIBRANT = {"seed": {"rule": "darkness"},
 class Helper(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        self.shell = self.path("ajmashell")
-        os.makedirs(os.path.join(self.shell, "wallpaper"))
-        shutil.copy(RECIPE_MODULE, os.path.join(self.shell, "wallpaper"))
-        with open(os.path.join(self.shell, "wallpaper", "indexer.py"), "w") as f:
-            f.write(STUB_INDEXER)
         self.recipe_file = self.path("palette-recipe.json")
         self.write(self.recipe_file, VIBRANT)
+        self.shell = self.stand_in("ajmashell", self.recipe_file)
         self.index = self.path("index.json")
         self.write(self.index, {"items": []})
-        self.settings = {"ajmashellDir": self.shell, "recipeFile": self.recipe_file, "wallpaperIndex": self.index,
+        self.settings = {"ajmashellDir": self.shell, "wallpaperIndex": self.index,
                          "currentWallpaper": self.path("current_wallpaper"), "kittyTemplate": self.path("kitty.conf"),
                          "looknfeel": self.path("looknfeel.lua"), "windowRules": self.path("rules.lua"),
                          "wpapply": self.path("wpapply.sh")}
@@ -55,6 +53,21 @@ class Helper(unittest.TestCase):
             self.proc.stdin.close()
             self.proc.stdout.close()
         shutil.rmtree(self.tmp)
+
+    def stand_in(self, name, recipe_file):
+        """An Ajmashell directory whose palette_recipe.py reads and saves recipe_file. Without the DEFAULT_PATH line
+        the test stops here: the copy would save into the real palette recipe file."""
+        folder = self.path(name)
+        os.makedirs(os.path.join(folder, "wallpaper"))
+        with open(RECIPE_MODULE) as f:
+            code, n = re.subn(r"^DEFAULT_PATH = .*$", f"DEFAULT_PATH = {recipe_file!r}", f.read(), flags=re.M)
+        if n != 1:
+            self.fail(f"{RECIPE_MODULE}: no single DEFAULT_PATH line to point at the temporary directory")
+        with open(os.path.join(folder, "wallpaper", "palette_recipe.py"), "w") as f:
+            f.write(code)
+        with open(os.path.join(folder, "wallpaper", "indexer.py"), "w") as f:
+            f.write(STUB_INDEXER)
+        return folder
 
     def path(self, name):
         return os.path.join(self.tmp, name)
@@ -94,7 +107,7 @@ class Helper(unittest.TestCase):
             if msg["type"] == type_:
                 return msg
 
-    def test_ready_reads_the_recipe_file_from_the_settings(self):
+    def test_ready_reads_the_recipe_file_of_the_module(self):
         ready = self.start()
         self.assertEqual(ready["recipe"], VIBRANT)
         self.assertEqual(ready["items"], [])
@@ -118,12 +131,17 @@ class Helper(unittest.TestCase):
         ready = self.start()
         found = {s["key"]: s["found"] for s in ready["settings"]}
         self.assertTrue(found["ajmashellDir"])
-        self.assertTrue(found["recipeFile"])
         self.assertFalse(found["wallpaperIndex"])
         self.assertFalse(found["kittyTemplate"])
         self.assertIsNone(ready["settingsWarning"])
         self.assertTrue(any("Super + W" in p for p in ready["problems"]))
         self.assertTrue(any("kitty mock-up is off" in p for p in ready["problems"]))
+
+    def test_missing_recipe_file_is_a_message_and_starting_values(self):
+        os.remove(self.recipe_file)
+        ready = self.start()
+        self.assertEqual(ready["recipe"]["palette"]["scheme"], "scheme-tonal-spot")
+        self.assertTrue(any(self.recipe_file in p and "starting values" in p for p in ready["problems"]))
 
     def test_missing_ajmashell_directory_is_a_message_not_a_crash(self):
         self.settings["ajmashellDir"] = self.path("nowhere")
@@ -164,13 +182,14 @@ class Helper(unittest.TestCase):
         other = self.path("other-recipe.json")
         self.write(other, {"seed": {"rule": "value"},
                            "palette": {"scheme": "scheme-fidelity", "contrast": 0.0, "lightnessDark": 0.0}})
-        self.send({"type": "settings", "paths": dict(self.settings, recipeFile=other)})
+        other_shell = self.stand_in("other-ajmashell", other)
+        self.send({"type": "settings", "paths": dict(self.settings, ajmashellDir=other_shell)})
         ready = self.expect("ready")
         self.assertEqual(ready["recipe"]["palette"]["scheme"], "scheme-fidelity")
         self.assertEqual(self.proc.pid, pid)  # same process for the window: the helper restarted itself
         self.assertIsNone(self.proc.poll())
         with open(self.path("config/ajmashell-theme-center/settings.json")) as f:
-            self.assertEqual(json.load(f)["recipeFile"], other)
+            self.assertEqual(json.load(f)["ajmashellDir"], other_shell)
 
     def test_bad_settings_are_refused(self):
         self.start()

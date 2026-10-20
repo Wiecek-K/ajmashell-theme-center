@@ -37,7 +37,7 @@ class Load(unittest.TestCase):
         paths, warning = settings.load(self.file)
         self.assertIsNone(warning)
         self.assertEqual(paths["ajmashellDir"], os.path.join(HOME, "elsewhere/ajmashell"))
-        self.assertEqual(paths["recipeFile"], os.path.join(HOME, ".config/matugen/przepis-palety.json"))
+        self.assertEqual(paths["currentWallpaper"], os.path.join(HOME, ".config/hypr/current_wallpaper"))
 
     def test_broken_file_gives_defaults_and_a_warning(self):
         self.write("{not json")
@@ -92,12 +92,12 @@ class Status(unittest.TestCase):
             index = os.path.join(d, "index.json")
             open(index, "w").close()
             paths = settings.resolve({"ajmashellDir": shell, "wallpaperIndex": index,
-                                      "recipeFile": os.path.join(d, "missing.json")})
+                                      "currentWallpaper": os.path.join(d, "missing")})
             st = {s["key"]: s for s in settings.status(paths)}
             self.assertTrue(st["ajmashellDir"]["found"])
             self.assertTrue(st["wallpaperIndex"]["found"])
-            self.assertFalse(st["recipeFile"]["found"])
-            self.assertEqual(st["recipeFile"]["default"], "~/.config/matugen/przepis-palety.json")
+            self.assertFalse(st["currentWallpaper"]["found"])
+            self.assertEqual(st["currentWallpaper"]["default"], "~/.config/hypr/current_wallpaper")
             self.assertEqual(st["ajmashellDir"]["own"], shell)
             self.assertEqual(st["wpapply"]["own"], "")  # the default: an empty field
             self.assertEqual([s["key"] for s in settings.status(paths)], list(settings.DEFAULTS))
