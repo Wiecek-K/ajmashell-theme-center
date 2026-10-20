@@ -5,14 +5,17 @@
 # dotfiles by path, never copied, so the tool shows exactly what wpapply.sh and the carousel indexer would do.
 #
 # Window -> helper (stdin):
-#   {"type": "compute", "recipe": {...} | null, "order": [fileName, ...]}
-#       recipe null = the system Przepis file. order = wallpapers to compute, the selected one first. A request with
-#       another recipe drops the queue of the previous one; the same recipe only reorders what is still waiting.
+#   {"type": "compute", "recipes": [{...} | null, ...], "order": [fileName, ...]}
+#       recipes = Przepis obecny and Przepis próbny (null = the system Przepis file); order = wallpapers to compute,
+#       the selected one first. Jobs run wallpaper by wallpaper, both recipes for each. A new request replaces the
+#       queue of the previous one: jobs of recipes it no longer names are dropped, the rest follow the new order.
 # Helper -> window (stdout):
-#   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint"}
+#   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint",
+#    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]}}   (palette_recipe.options())
+#   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
 #   {"type": "result", "fingerprint", "fileName", "candidates": [hex], "seed": hex, "bucket", "colors": {token: hex}}
 #   {"type": "error", "fingerprint", "fileName", "message"}
-#   {"type": "progress", "fingerprint", "done": n, "total": n}
+#   {"type": "progress", "fingerprint", "done": n, "total": n}   (per recipe; total = all wallpapers)
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in ~/.cache/matugen-ajmashell-tool, so a
 # second start is instant. At most half the cores, like the indexer (the CPU is this machine's bottleneck).
@@ -127,66 +130,69 @@ def load_items():
 
 
 class Queue:
-    """Jobs of the newest request only. Workers take the first waiting job; a new recipe replaces the list."""
+    """Jobs (fingerprint, fileName) of the newest request only. Workers take the first waiting job; what a recipe has
+    done is kept for the whole run, so going back to an earlier recipe only computes what it is still missing."""
 
     def __init__(self, items):
         self.by_name = {i["fileName"]: i for i in items}
         self.cond = threading.Condition()
         self.waiting = []
-        self.recipe = None
-        self.fingerprint = None
-        self.done = set()
-        self.total = 0
+        self.recipes = {}   # fingerprint -> validated recipe
+        self.done = {}      # fingerprint -> fileNames with a result or an error
+        self.running = set()
 
-    def request(self, recipe, order):
-        fingerprint = palette_recipe.fingerprint(recipe)
+    def request(self, recipes, order):
+        fingerprints = [palette_recipe.fingerprint(r) for r in recipes]
+        send({"type": "accepted", "recipes": recipes, "fingerprints": fingerprints})
         names = [n for n in order if n in self.by_name]
+        unique = list(dict.fromkeys(fingerprints))
+        for fp, recipe in zip(fingerprints, recipes):
+            if fp in self.done:
+                continue
+            with self.cond:
+                self.recipes[fp], self.done[fp] = recipe, set()
+            for n in self.by_name:  # first time this recipe is seen: what the disk cache already has
+                r = cached(self.by_name[n], fp)
+                if r is not None:
+                    self.finish(fp, n, {"type": "result", "fingerprint": fp, "fileName": n, **r})
+            if not self.by_name:
+                send({"type": "progress", "fingerprint": fp, "done": 0, "total": 0})
         with self.cond:
-            if fingerprint == self.fingerprint:
-                pending = set(self.waiting)
-                self.waiting = [n for n in names if n in pending]
-                return
-            self.recipe, self.fingerprint = recipe, fingerprint
-            self.done, self.total, self.waiting = set(), len(names), []
-        misses = []
-        for n in names:
-            r = cached(self.by_name[n], fingerprint)
-            if r is None:
-                misses.append(n)
-            else:
-                self.finish(fingerprint, n, {"type": "result", "fingerprint": fingerprint, "fileName": n, **r})
-        with self.cond:
-            self.waiting = misses
+            self.waiting = [(fp, n) for n in names for fp in unique
+                            if n not in self.done[fp] and (fp, n) not in self.running]
             self.cond.notify_all()
-        if not names:
-            send({"type": "progress", "fingerprint": fingerprint, "done": 0, "total": 0})
 
     def finish(self, fingerprint, name, msg):
         send(msg)
         with self.cond:
-            if fingerprint != self.fingerprint or name in self.done:
+            if name in self.done[fingerprint]:
                 return
-            self.done.add(name)
-            send({"type": "progress", "fingerprint": fingerprint, "done": len(self.done), "total": self.total})
+            self.done[fingerprint].add(name)
+            send({"type": "progress", "fingerprint": fingerprint, "done": len(self.done[fingerprint]),
+                  "total": len(self.by_name)})
 
     def take(self):
         with self.cond:
             while not self.waiting:
                 self.cond.wait()
-            return self.waiting.pop(0), self.recipe, self.fingerprint
+            job = self.waiting.pop(0)
+            self.running.add(job)
+            return job, self.recipes[job[0]]
 
     def work(self):
         while True:
-            name, recipe, fingerprint = self.take()
+            (fingerprint, name), recipe = self.take()
             item = self.by_name[name]
             try:
                 r = compute(item, recipe)
             except (RuntimeError, OSError, ValueError, KeyError, subprocess.SubprocessError) as e:
                 self.finish(fingerprint, name, {"type": "error", "fingerprint": fingerprint, "fileName": name,
                                                 "message": str(e)})
-                continue
-            store(item, fingerprint, r)
-            self.finish(fingerprint, name, {"type": "result", "fingerprint": fingerprint, "fileName": name, **r})
+            else:
+                store(item, fingerprint, r)
+                self.finish(fingerprint, name, {"type": "result", "fingerprint": fingerprint, "fileName": name, **r})
+            with self.cond:
+                self.running.discard((fingerprint, name))
 
 
 def main():
@@ -197,7 +203,7 @@ def main():
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
-          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe)})
+          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe), "options": palette_recipe.options()})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
@@ -208,7 +214,7 @@ def main():
         except ValueError:
             continue
         if msg.get("type") == "compute":
-            queue.request(validated(msg.get("recipe")), msg.get("order") or [])
+            queue.request([validated(r) for r in msg.get("recipes") or [None]], msg.get("order") or [])
     os._exit(0)  # window closed: drop the queue, do not wait for running matugen calls
 
 

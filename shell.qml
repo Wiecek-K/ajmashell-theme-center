@@ -1,8 +1,8 @@
 //@ pragma AppId matugen-ajmashell-tool
 // Palette tuning tool (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the system gives it.
 // Layout = variant D of the prototype (branch prototype/faza-e-karta-ui): strip of all wallpapers on the left, the
-// selected one with its Kandydaci and the full token table in the middle, panel on the right (controls from ticket
-// 05; mock-ups between the table and the panel come in ticket 06). Colours come from helper/tuner.py (real
+// selected one with its Kandydaci and the full token table in the middle, panel on the right with the controls of the
+// Przepis próbny (ticket 05; mock-ups between the table and the panel come in ticket 06). Colours come from helper/tuner.py (real
 // matugen through the dotfiles' palette_recipe.py); this file only holds the state and the protocol.
 // Start: qs -n -p ~/Projects/matugen-ajmashell-tool (the .desktop entry does the same).
 import QtQuick
@@ -21,22 +21,55 @@ ShellRoot {
         readonly property var it: items.length ? items[sel] : null
         property var recipe: null       // Przepis obecny (the system file, validated by the helper)
         property string fingerprint: ""
-        // results[fingerprint][fileName] = {seed, candidates, bucket, colors} or {error}; rev changes on every write,
-        // so bindings that read results depend on rev
+        property var trial: null        // Przepis próbny: starts as a copy of the current one, changed by the controls
+        property string trialFingerprint: ""
+        property var options: null      // palette_recipe.options(): rules, schemes, number ranges
+        // results[fingerprint][fileName] = {seed, candidates, bucket, colors, key} or {error}; done[fingerprint] = n.
+        // Messages write them at once, rev follows at most every 80 ms (pending): one rebind of the strip and the
+        // summary per batch, not per message, so moving a control does not stall the window.
         property var results: ({})
+        property var done: ({})
         property int rev: 0
-        property int done: 0
-        property int total: 0
+        property bool pending: false
         property string helperError: ""
         property string copied: ""
 
+        readonly property bool trialDiffers: fingerprint !== trialFingerprint
+        readonly property int total: items.length
+        // the folder summary: wallpapers with both results, of them how many get another Seed / only another palette
+        readonly property var summary: {
+            rev; // dependency
+            let both = 0, seed = 0, palette = 0;
+            for (const x of items) {
+                const d = diff(x.fileName);
+                if (d === "") continue;
+                both++;
+                if (d === "seed") seed++;
+                else if (d === "palette") palette++;
+            }
+            return { both: both, seed: seed, palette: palette };
+        }
+
         readonly property var ui: ({ bg: "#141416", panel: "#1d1d21", line: "#2e2e34", text: "#e6e6ea", dim: "#9a9aa4",
-                                     accent: "#8ab4f8", error: "#ff8a80", font: "Inter" })
+                                     accent: "#8ab4f8", trial: "#ffb74d", error: "#ff8a80", font: "Inter" })
 
         function result(fileName, fp) {
             rev; // dependency
             const r = results[fp || fingerprint];
             return r ? r[fileName] || null : null;
+        }
+
+        function doneOf(fp) {
+            rev; // dependency
+            return done[fp] || 0;
+        }
+
+        // What the trial changes on one wallpaper: "seed", "palette" (same Seed, other tokens), "same", or "" while
+        // either result is missing or failed.
+        function diff(fileName) {
+            const a = result(fileName, fingerprint), b = result(fileName, trialFingerprint);
+            if (!a || !b || a.error || b.error) return "";
+            return a.seed !== b.seed ? "seed" : a.key !== b.key ? "palette" : "same";
         }
 
         // Selected wallpaper first, then its neighbours outwards: the strip is browsed with the arrows.
@@ -51,31 +84,56 @@ ShellRoot {
 
         function request() {
             if (!items.length) return;
-            helper.write(JSON.stringify({ type: "compute", recipe: recipe, order: order() }) + "\n");
+            helper.write(JSON.stringify({ type: "compute", recipes: [recipe, trial], order: order() }) + "\n");
         }
 
         function select(i) {
             if (i < 0 || i >= items.length || i === sel) return;
             sel = i;
-            if (done < total) request(); // same recipe: the helper only moves the selected one to the front
+            // same recipes: the helper only moves the selected one to the front
+            if (doneOf(fingerprint) < total || doneOf(trialFingerprint) < total) request();
+        }
+
+        // A control changed one field of the trial: the request waits for the control to settle (debounce).
+        function setTrial(section, key, value) {
+            const t = JSON.parse(JSON.stringify(trial));
+            t[section][key] = value;
+            trial = t;
+            debounce.restart();
+        }
+
+        function restore() {
+            trial = JSON.parse(JSON.stringify(recipe));
+            debounce.stop();
+            request();
         }
 
         function onMessage(m) {
             if (m.type === "ready") {
                 recipe = m.recipe;
                 fingerprint = m.fingerprint;
+                trial = JSON.parse(JSON.stringify(m.recipe));
+                trialFingerprint = m.fingerprint;
+                options = m.options;
                 current = m.current || "";
                 items = m.items;
                 sel = Math.max(0, items.findIndex(x => x.fileName === current));
-                total = items.length;
                 request();
+            } else if (m.type === "accepted") {
+                fingerprint = m.fingerprints[0];
+                trialFingerprint = m.fingerprints[1];
             } else if (m.type === "result" || m.type === "error") {
                 const r = results[m.fingerprint] || (results[m.fingerprint] = {});
-                r[m.fileName] = m.type === "error" ? { error: m.message } : m;
-                rev++;
-            } else if (m.type === "progress" && m.fingerprint === fingerprint) {
-                done = m.done;
-                total = m.total;
+                if (m.type === "error")
+                    r[m.fileName] = { error: m.message };
+                else {
+                    m.key = Object.values(m.colors).join(","); // tokens come sorted: equal palettes, equal keys
+                    r[m.fileName] = m;
+                }
+                pending = true;
+            } else if (m.type === "progress") {
+                done[m.fingerprint] = m.done;
+                pending = true;
             }
         }
 
@@ -89,6 +147,24 @@ ShellRoot {
             const c = Qt.color(hex);
             return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.55 ? "#111111" : "#f2f2f2";
         }
+    }
+
+    Timer {
+        // results to bindings in batches (see app.pending)
+        interval: 80
+        repeat: true
+        running: app.pending
+        onTriggered: {
+            app.pending = false;
+            app.rev++;
+        }
+    }
+
+    Timer {
+        // debounce of the controls: one request for the last value, not one per slider step
+        id: debounce
+        interval: 300
+        onTriggered: app.request()
     }
 
     Process {

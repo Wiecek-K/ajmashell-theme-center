@@ -1,6 +1,8 @@
 // Strip of all carousel wallpapers on the left (thumbnails from the carousel cache), as in variant D of the
 // prototype. Arrows move the selection (shell.qml); a click selects. Marks: selection frame, "bieżąca" = the
-// system's current wallpaper, Seed dot, error badge.
+// system's current wallpaper, Seed dot (a second one when the trial picks another Seed), error badge, and what the
+// Przepis próbny changes there ("Seed" or "paleta").
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
@@ -28,6 +30,8 @@ ListView {
         required property var modelData
         required property int index
         readonly property var res: list.app.result(modelData.fileName)
+        readonly property var trialRes: list.app.result(modelData.fileName, list.app.trialFingerprint)
+        readonly property string diff: list.app.diff(modelData.fileName)
         readonly property bool selected: index === list.app.sel
         width: list.width - 10
         height: width * 9 / 16
@@ -53,12 +57,28 @@ ListView {
             color: list.app.ui.accent
             Text { id: cur; anchors.centerIn: parent; text: "bieżąca"; color: "#101010"; font { family: list.app.ui.font; pixelSize: 10; bold: true } }
         }
-        Rectangle {
-            visible: !!(d.res && d.res.seed)
+        Row {
             anchors { right: parent.right; bottom: parent.bottom; margins: 8 }
-            width: 14; height: 14; radius: 7
-            color: d.res && d.res.seed ? d.res.seed : "transparent"
-            border.color: "white"
+            spacing: 4
+            Rectangle {
+                visible: !!(d.res && d.res.seed)
+                width: 14; height: 14; radius: 7
+                color: d.res && d.res.seed ? d.res.seed : "transparent"
+                border.color: "white"
+            }
+            Rectangle {
+                visible: d.diff === "seed"
+                width: 14; height: 14; radius: 7
+                color: d.trialRes && d.trialRes.seed ? d.trialRes.seed : "transparent"
+                border { color: list.app.ui.trial; width: 2 }
+            }
+        }
+        Rectangle {
+            visible: d.diff === "seed" || d.diff === "palette"
+            anchors { left: parent.left; bottom: parent.bottom; margins: 8 }
+            width: chg.implicitWidth + 10; height: 16; radius: 8
+            color: list.app.ui.trial
+            Text { id: chg; anchors.centerIn: parent; text: d.diff === "seed" ? "Seed" : "paleta"; color: "#101010"; font { family: list.app.ui.font; pixelSize: 10; bold: true } }
         }
         Rectangle {
             visible: !!(d.res && d.res.error)

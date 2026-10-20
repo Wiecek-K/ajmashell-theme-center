@@ -10,13 +10,17 @@ Pokazuje dla każdej tapety karuzeli paletę, którą da system według Przepisu
   kopia w repo: `matugen-ajmashell-tool.desktop`; po zmianie: `install -Dm644 matugen-ajmashell-tool.desktop ~/.local/share/applications/`).
 - Ręcznie: `qs -n -p ~/Projects/matugen-ajmashell-tool` (`-n`: drugie uruchomienie nie otwiera drugiego okna).
 - Klawisze: `↑` `↓` (i `←` `→`) zmieniają tapetę, `Home` / `End` pierwsza / ostatnia. Klik w próbkę kopiuje hex.
+- Kontrolki (panel z prawej) zmieniają Przepis próbny: reguła Seeda, schemat, kontrast, jasność palety ciemnej.
+  Listy i zakresy z `palette_recipe.options()`; jasność ciemnej nie ma dolnej granicy w matugenie (−∞), suwak
+  zaczyna się od −1. Żądanie idzie do pomocnika po 300 ms spokoju (debounce). „przywróć obecny” wraca do pliku
+  Przepisu systemu. Taśma: „Seed” / „paleta” = co próba zmienia na tej tapecie; drugi punkt = Seed próbny.
 
 ## Budowa
 
 | Plik | Rola |
 |---|---|
 | `shell.qml` | stan okna i protokół z pomocnikiem; `//@ pragma AppId` daje klasę okna `matugen-ajmashell-tool` |
-| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` | układ wariantu D z prototypu (gałąź `prototype/faza-e-karta-ui`): taśma z lewej, podgląd z Kandydatami i tabela w środku, panel z prawej |
+| `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (z `Chip.qml`, `TrialSlider.qml`) | układ wariantu D z prototypu (gałąź `prototype/faza-e-karta-ui`): taśma z lewej, podgląd z Kandydatami i tabela w środku, panel z prawej |
 | `helper/tuner.py` | pomocnik: prawdziwy matugen, moduł Przepisu i kategorie z dotfiles (import po ścieżce, bez kopii) |
 
 Protokół (JSON, jeden komunikat w linii) opisany w nagłówku `helper/tuner.py`.
@@ -27,7 +31,8 @@ można go usunąć w każdej chwili. Po aktualizacji matugena usuń go (odcisk n
 
 Zmiana tych ścieżek w Ajmashellu psuje narzędzie bez ostrzeżenia:
 
-- `~/.config/quickshell/ajmashell/wallpaper/palette_recipe.py` (`load`, `seed_flags`, `palette_flags`, `fingerprint`)
+- `~/.config/quickshell/ajmashell/wallpaper/palette_recipe.py` (`load`, `seed_flags`, `palette_flags`, `fingerprint`,
+  `options`)
   i `indexer.py` (`color_bucket`),
 - `~/.config/matugen/przepis-palety.json` (Przepis systemu),
 - `~/.cache/ajmashell/wallpapers/index.json` (lista tapet i miniatury),

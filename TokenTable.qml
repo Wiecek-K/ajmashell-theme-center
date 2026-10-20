@@ -1,15 +1,21 @@
 // Full token table of the dark palette (all tokens matugen gives, as in ~/.local/state/ajmashell/colors.json),
-// as in variant D of the prototype: groups in two columns when there is room, row = token name + swatch with hex.
+// as in variant D of the prototype: groups in two columns when there is room, row = token name + swatch with hex for
+// the Przepis obecny and the Przepis próbny; "≠" and the trial colour mark a token the trial changes.
 // A click on a swatch copies the hex.
+pragma ComponentBehavior: Bound
 import QtQuick
 
 Grid {
     id: t
     property var app
     property var res
+    property var trialRes
     readonly property var colors: res && res.colors ? res.colors : null
+    readonly property var trialColors: trialRes && trialRes.colors ? trialRes.colors : null
 
     columns: width > 980 ? 2 : 1
+    // token name column: narrower in one column (window tiled on half the screen), so both swatches fit
+    readonly property int nameWidth: columns === 2 ? 230 : Math.max(120, Math.min(230, width - 2 * 110 - 16))
     columnSpacing: 28
     rowSpacing: 14
 
@@ -30,15 +36,16 @@ Grid {
             { name: "Błąd", tokens: ["error", "on_error", "error_container", "on_error_container"] },
             { name: "Inne", tokens: ["source_color", "shadow", "scrim"] }
         ];
-        if (colors) {
+        const all = colors || trialColors;
+        if (all) {
             const known = new Set(g.reduce((all, x) => all.concat(x.tokens), []));
-            g[g.length - 1].tokens = g[g.length - 1].tokens.concat(Object.keys(colors).filter(k => !known.has(k)));
+            g[g.length - 1].tokens = g[g.length - 1].tokens.concat(Object.keys(all).filter(k => !known.has(k)));
         }
         return g;
     }
 
     Repeater {
-        model: t.colors ? t.groups : []
+        model: t.colors || t.trialColors ? t.groups : []
         Column {
             id: grp
             required property var modelData
@@ -46,23 +53,38 @@ Grid {
             Text { text: grp.modelData.name; color: t.app.ui.accent; font { family: t.app.ui.font; pixelSize: 12; bold: true } }
             Row {
                 spacing: 8
-                Text { width: 230; text: "token"; color: t.app.ui.dim; font { family: t.app.ui.font; pixelSize: 10 } }
-                Text { width: 110; text: "obecny"; color: t.app.ui.dim; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
+                Text { width: t.nameWidth; text: "token"; color: t.app.ui.dim; font { family: t.app.ui.font; pixelSize: 10 } }
+                Text { width: 110; text: "obecny"; color: t.app.ui.accent; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
+                Text { width: 110; text: "próbny"; color: t.app.ui.trial; font { family: t.app.ui.font; pixelSize: 10; bold: true } }
             }
             Repeater {
                 model: grp.modelData.tokens
                 Row {
                     id: row
                     required property string modelData
-                    readonly property string hex: t.colors[modelData] || ""
+                    readonly property string hex: t.colors ? t.colors[modelData] || "" : ""
+                    readonly property string trialHex: t.trialColors ? t.trialColors[modelData] || "" : ""
+                    // only when both are known: a missing trial result is "still computing", not a change
+                    readonly property bool differs: hex !== "" && trialHex !== "" && hex !== trialHex
                     spacing: 8
-                    Text { width: 230; text: row.modelData; color: t.app.ui.text; font { family: "monospace"; pixelSize: 12 } }
-                    Rectangle {
-                        width: 110; height: 20; radius: 4
-                        color: row.hex || "transparent"
-                        border.color: t.app.ui.line
-                        Text { anchors.centerIn: parent; text: row.hex || "—"; color: t.app.contrastText(row.hex); font { family: "monospace"; pixelSize: 11 } }
-                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: row.hex !== ""; onClicked: t.app.copy(row.hex) }
+                    Text {
+                        width: t.nameWidth
+                        elide: Text.ElideRight
+                        text: (row.differs ? "≠ " : "  ") + row.modelData
+                        color: row.differs ? t.app.ui.trial : t.app.ui.text
+                        font { family: "monospace"; pixelSize: 12 }
+                    }
+                    Repeater {
+                        model: [row.hex, row.trialHex]
+                        Rectangle {
+                            id: sw
+                            required property string modelData
+                            width: 110; height: 20; radius: 4
+                            color: modelData || "transparent"
+                            border.color: t.app.ui.line
+                            Text { anchors.centerIn: parent; text: sw.modelData || "—"; color: t.app.contrastText(sw.modelData); font { family: "monospace"; pixelSize: 11 } }
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: sw.modelData !== ""; onClicked: t.app.copy(sw.modelData) }
+                        }
                     }
                 }
             }

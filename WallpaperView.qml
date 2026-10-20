@@ -1,5 +1,6 @@
-// The selected wallpaper, as in variant D of the prototype: preview with the Kandydaci next to it (Seed marked),
-// the colour bucket of the carousel, and the full token table below.
+// The selected wallpaper, as in variant D of the prototype: preview with the Kandydaci next to it (Seed of each
+// Przepis marked), the colour bucket of the carousel for both, and the full token table below.
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
@@ -8,6 +9,11 @@ Flickable {
     property var app
     readonly property var it: app.it
     readonly property var res: it ? app.result(it.fileName) : null
+    readonly property var trialRes: it ? app.result(it.fileName, app.trialFingerprint) : null
+
+    function bucket(r) {
+        return !r ? "liczenie…" : r.error ? "błąd matugena" : r.bucket;
+    }
 
     clip: true
     contentHeight: main.implicitHeight
@@ -43,6 +49,7 @@ Flickable {
             }
 
             Column {
+                id: info
                 width: Math.min(460, main.width)
                 spacing: 8
                 Text {
@@ -55,15 +62,28 @@ Flickable {
                 Text {
                     width: parent.width
                     wrapMode: Text.Wrap
-                    text: !v.res ? "Liczenie…"
-                          : v.res.error ? "Błąd matugena: " + v.res.error
-                          : "Kategoria karuzeli: " + v.res.bucket
-                    color: v.res && v.res.error ? v.app.ui.error : v.app.ui.dim
+                    readonly property bool moved: !!(v.res && v.trialRes && v.res.bucket && v.res.bucket !== v.trialRes.bucket)
+                    text: "Kategoria karuzeli: obecny " + v.bucket(v.res) + " · próbny " + v.bucket(v.trialRes)
+                          + (moved ? "   ← inna" : "")
+                    color: moved ? v.app.ui.trial : v.app.ui.dim
                     font { family: v.app.ui.font; pixelSize: 12 }
+                }
+                Repeater {
+                    // matugen error of either Przepis
+                    model: [["obecny", v.res], ["próbny", v.trialRes]].filter(x => x[1] && x[1].error)
+                    Text {
+                        required property var modelData
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "Błąd matugena (" + modelData[0] + "): " + modelData[1].error
+                        color: v.app.ui.error
+                        font { family: v.app.ui.font; pixelSize: 12 }
+                    }
                 }
                 Text { text: "Kandydaci (od najbardziej dominującego)"; color: v.app.ui.dim; font { family: v.app.ui.font; pixelSize: 12 } }
                 Repeater {
-                    model: v.res && v.res.candidates ? v.res.candidates : []
+                    // Kandydaci depend on the thumbnail only: the same for both Przepisy
+                    model: v.res && v.res.candidates ? v.res.candidates : v.trialRes && v.trialRes.candidates ? v.trialRes.candidates : []
                     Row {
                         id: k
                         required property string modelData
@@ -76,8 +96,13 @@ Flickable {
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Kandydat " + (k.index + 1) + "  " + k.modelData + (k.modelData === v.res.seed ? "   ← Seed" : "")
-                            color: v.app.ui.text
+                            width: info.width - 46
+                            wrapMode: Text.Wrap
+                            readonly property bool isTrial: !!(v.trialRes && k.modelData === v.trialRes.seed)
+                            text: "Kandydat " + (k.index + 1) + "  " + k.modelData
+                                  + (v.res && k.modelData === v.res.seed ? "   ← Seed obecny" : "")
+                                  + (isTrial ? "   ← Seed próbny" : "")
+                            color: isTrial && !(v.res && k.modelData === v.res.seed) ? v.app.ui.trial : v.app.ui.text
                             font { family: "monospace"; pixelSize: 13 }
                         }
                     }
@@ -88,6 +113,7 @@ Flickable {
         TokenTable {
             app: v.app
             res: v.res
+            trialRes: v.trialRes
             width: main.width
         }
     }
