@@ -110,6 +110,7 @@ class Helper(unittest.TestCase):
     def test_ready_reads_the_recipe_file_of_the_module(self):
         ready = self.start()
         self.assertEqual(ready["recipe"], VIBRANT)
+        self.assertEqual(ready["recipeFile"], self.recipe_file)  # shown in the Settings panel
         self.assertEqual(ready["items"], [])
         self.assertIn("scheme-vibrant", ready["options"]["schemes"])
 

@@ -113,6 +113,26 @@ Rectangle {
                 }
             }
 
+            Column {
+                // not a setting: the file the recipe module of the Ajmashell directory names, the same file
+                // indexer.py and wpapply.sh read (user, 2026-10-21)
+                width: col.width
+                spacing: 4
+                Text {
+                    text: "Palette recipe file"
+                    color: p.app.ui.text
+                    font { family: p.app.ui.font; pixelSize: 13; bold: true }
+                }
+                Text {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: p.app.recipeFile ? p.app.recipeFile + "   (named by palette_recipe.py of the Ajmashell directory)"
+                          : "unknown: no palette recipe module in the Ajmashell directory"
+                    color: p.app.recipeFile ? p.app.ui.dim : p.app.ui.error
+                    font { family: "monospace"; pixelSize: 12 }
+                }
+            }
+
             Row {
                 spacing: 8
                 Chip {

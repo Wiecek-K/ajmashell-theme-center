@@ -30,7 +30,8 @@
 #    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]} | null,   (palette_recipe.options())
 #    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]},
 #       (system_look(): what the mock-ups read from the system's own files, see there)
-#    "settings": [{key, label, value, default, found, problem}],   (settings.status())
+#    "settings": [{key, label, value, own, default, found, problem}],   (settings.status())
+#    "recipeFile": path | null,   (palette_recipe.DEFAULT_PATH of the module in use; null without the module)
 #    "settingsFile": path, "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
 #    "problems": [text]}   (each missing path with what it stops; shown in the window)
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
@@ -359,6 +360,7 @@ def main():
           "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe) if recipe else None,
           "options": palette_recipe.options() if palette_recipe else None, "look": system_look(),
           "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
+          "recipeFile": palette_recipe.DEFAULT_PATH if palette_recipe else None,
           "problems": problems})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)

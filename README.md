@@ -99,8 +99,8 @@ wallpaper the result equals `~/.local/state/ajmashell/colors.json` (checked 2026
 `tests/run.sh` runs every helper test (Python standard library, `unittest`):
 
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
-- `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file from the settings,
-  two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the helper
+- `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
+  recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the helper
   restarts in the same process), missing paths as messages, a save with its steps. Everything runs in a temporary
   directory with a copy of the real `palette_recipe.py` (from `$AJMASHELL_DIR` or `~/.config/quickshell/ajmashell`;
   the tests skip without it) and stand-ins for `indexer.py` and `wpapply.sh`; matugen is not called. A helper that

@@ -53,6 +53,7 @@ ShellRoot {
         // helper checks it ("checked" = status of the draft) and, on apply, saves it and restarts (restarting)
         property var settings: []
         property string settingsFile: ""
+        property string recipeFile: ""  // named by the recipe module, not a setting (user, 2026-10-21)
         property string settingsWarning: ""
         property var problems: []
         property bool settingsOpen: false
@@ -219,6 +220,7 @@ ShellRoot {
                 restarting = false;
                 settings = m.settings;
                 settingsFile = m.settingsFile;
+                recipeFile = m.recipeFile || "";
                 settingsWarning = m.settingsWarning || "";
                 problems = m.problems;
                 discardSettings();
