@@ -15,6 +15,8 @@ Pokazuje dla każdej tapety karuzeli paletę, którą da system według Przepisu
   zaczyna się od −1. Żądanie idzie do pomocnika po 300 ms spokoju (debounce). Próba liczy się tylko dla wybranej
   tapety (i każdej, którą potem wybierzesz); resztę folderu liczy przycisk „przelicz wszystkie tapety”. „przywróć obecny” wraca do pliku
   Przepisu systemu. Taśma: „Seed” / „paleta” = co próba zmienia na tej tapecie; drugi punkt = Seed próbny.
+- „zapisz jako Przepis systemu” zapisuje próbę przez `palette_recipe.save()` (atomowo, bez commita), potem w tle
+  `indexer.py` i `wpapply.sh` na bieżącej tapecie; etapy pod przyciskiem. Zapisany Przepis staje się obecnym.
 
 ## Budowa
 
@@ -37,7 +39,8 @@ Zmiana tych ścieżek w Ajmashellu psuje narzędzie bez ostrzeżenia:
 - `~/.config/quickshell/ajmashell/wallpaper/palette_recipe.py` (`load`, `seed_flags`, `palette_flags`, `fingerprint`,
   `options`)
   i `indexer.py` (`color_bucket`),
-- `~/.config/matugen/przepis-palety.json` (Przepis systemu),
+- `~/.config/matugen/przepis-palety.json` (Przepis systemu; zapis przez `palette_recipe.save`),
+- `~/.config/hypr/scripts/wpapply.sh` (nałożenie po zapisie; `indexer.py` też uruchamiany),
 - `~/.cache/ajmashell/wallpapers/index.json` (lista tapet i miniatury),
 - `~/.config/hypr/current_wallpaper` (bieżąca tapeta),
 - makiety czytają przy starcie (`system_look()` w pomocniku): szablon `~/.config/matugen/templates/kitty-colors.conf`
