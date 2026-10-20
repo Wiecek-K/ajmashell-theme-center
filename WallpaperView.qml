@@ -1,5 +1,6 @@
 // The selected wallpaper, as in variant D of the prototype: preview with the Kandydaci next to it (Seed of each
-// Przepis marked), the colour bucket of the carousel for both, and the full token table below.
+// Przepis marked), the colour bucket of the carousel for both, the mock-ups when the window is narrow (shell.qml),
+// and the full token table below.
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -7,6 +8,7 @@ import QtQuick.Controls
 Flickable {
     id: v
     property var app
+    property bool mockups: false // the mock-ups of both Przepisy here, under the Kandydaci (narrow window)
     readonly property var it: app.it
     readonly property var res: it ? app.result(it.fileName) : null
     readonly property var trialRes: it ? app.result(it.fileName, app.trialFingerprint) : null
@@ -108,6 +110,12 @@ Flickable {
                     }
                 }
             }
+        }
+
+        Previews {
+            visible: v.mockups
+            app: v.app
+            width: Math.min(main.width, 900)
         }
 
         TokenTable {

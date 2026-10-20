@@ -2,7 +2,8 @@
 // Palette tuning tool (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the system gives it.
 // Layout = variant D of the prototype (branch prototype/faza-e-karta-ui): strip of all wallpapers on the left, the
 // selected one with its Kandydaci and the full token table in the middle, panel on the right with the controls of the
-// Przepis próbny (ticket 05; mock-ups between the table and the panel come in ticket 06). Colours come from helper/tuner.py (real
+// Przepis próbny (ticket 05), and the desktop and kitty mock-ups of both Przepisy (ticket 06) between the table and
+// the panel, or under the Kandydaci when the window is too narrow for both. Colours come from helper/tuner.py (real
 // matugen through the dotfiles' palette_recipe.py); this file only holds the state and the protocol.
 // Start: qs -n -p ~/Projects/matugen-ajmashell-tool (the .desktop entry does the same).
 import QtQuick
@@ -27,6 +28,7 @@ ShellRoot {
         // "przelicz wszystkie" (user, 2026-10-20). A new trial value goes back to the selected one only.
         property bool trialAll: false
         property var options: null      // palette_recipe.options(): rules, schemes, number ranges
+        property var look: null         // tuner.py system_look(): what the mock-ups read from the system's files
         // results[fingerprint][fileName] = {seed, candidates, bucket, colors, key} or {error}; done[fingerprint] = n.
         // Messages write them at once, rev follows at most every 80 ms (pending): one rebind of the strip and the
         // summary per batch, not per message, so moving a control does not stall the window.
@@ -128,6 +130,7 @@ ShellRoot {
                 trial = JSON.parse(JSON.stringify(m.recipe));
                 trialFingerprint = m.fingerprint;
                 options = m.options;
+                look = m.look;
                 current = m.current || "";
                 items = m.items;
                 sel = Math.max(0, items.findIndex(x => x.fileName === current));
@@ -233,9 +236,26 @@ ShellRoot {
                 anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
             }
 
+            // Mock-ups beside the token table while the table keeps its two columns (980 px, TokenTable) and the
+            // mock-ups get at least 420 px (prototype); otherwise inside the view, under the Kandydaci (tiled window).
+            readonly property real centre: width - strip.width - 2 * 8 - side.width - 2 * 16
+            readonly property bool mockupsBeside: centre - 980 - 16 >= 420
+
             WallpaperView {
                 app: app
-                anchors { top: parent.top; bottom: parent.bottom; left: strip.right; right: side.left; margins: 16 }
+                mockups: !parent.mockupsBeside
+                anchors { top: parent.top; bottom: parent.bottom; left: strip.right; right: parent.mockupsBeside ? beside.left : side.left; margins: 16 }
+            }
+
+            Flickable {
+                id: beside
+                visible: parent.mockupsBeside
+                width: visible ? Math.min(900, parent.centre - 980 - 16) : 0
+                anchors { top: parent.top; bottom: parent.bottom; right: side.left; topMargin: 16; bottomMargin: 16; rightMargin: 12 }
+                clip: true
+                contentHeight: besidePreviews.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                Previews { id: besidePreviews; app: app; width: beside.width }
             }
         }
     }

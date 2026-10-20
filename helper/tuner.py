@@ -12,7 +12,9 @@
 #       previous one: jobs it no longer names are dropped, the rest follow the new order.
 # Helper -> window (stdout):
 #   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null, "recipe": {...}, "fingerprint",
-#    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]}}   (palette_recipe.options())
+#    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]},   (palette_recipe.options())
+#    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]}}
+#       (system_look(): what the mock-ups read from the system's own files, see there)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
 #   {"type": "result", "fingerprint", "fileName", "candidates": [hex], "seed": hex, "bucket", "colors": {token: hex}}
 #   {"type": "error", "fingerprint", "fileName", "message"}
@@ -36,6 +38,9 @@ DOTFILES_WALLPAPER = os.path.join(HOME, ".config/quickshell/ajmashell/wallpaper"
 INDEX = os.path.join(HOME, ".cache/ajmashell/wallpapers/index.json")
 CURRENT = os.path.join(HOME, ".config/hypr/current_wallpaper")
 CACHE = os.path.join(HOME, ".cache/matugen-ajmashell-tool/results")
+KITTY_TEMPLATE = os.path.join(HOME, ".config/matugen/templates/kitty-colors.conf")
+LOOKNFEEL = os.path.join(HOME, ".config/hypr/configs/looknfeel.lua")
+RULES = os.path.join(HOME, ".config/hypr/configs/rules.lua")
 WORKERS = max(1, (os.cpu_count() or 2) // 2)
 
 sys.dont_write_bytecode = True  # no __pycache__ in the dotfiles
@@ -71,6 +76,42 @@ def validated(recipe):
         return palette_recipe.load(f.name)
     finally:
         os.unlink(f.name)
+
+
+def system_look():
+    """Colour sources of the kitty and window mock-ups, read from the system's files on every start (ticket 06,
+    story 41), so a changed template shows up in the mock-ups instead of drifting from them:
+    - kitty: every `key {{ colors.TOKEN.default.hex }}` line of the matugen kitty template,
+    - border: the tokens and angle of `active_border` in Hyprland's looknfeel.lua,
+    - kittyOpacity: the active opacity of the kitty window rule in rules.lua.
+    A file or line that cannot be read lands in `problems` (shown in the window); the mock-up then uses its
+    fallback from Mockups.js. The Ajmashell colours (Bar, popup) are QML bindings and stay mapped in Mockups.js."""
+    look = {"kitty": {}, "border": [], "borderAngle": 0, "kittyOpacity": None, "problems": []}
+
+    def read(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        except OSError as e:
+            look["problems"].append(f"{path}: {e.strerror}")
+            return ""
+
+    for m in re.finditer(r"^\s*(\w+)\s+\{\{\s*colors\.(\w+)\.default\.hex\s*\}\}", read(KITTY_TEMPLATE), re.M):
+        look["kitty"][m.group(1)] = m.group(2)
+    if not look["kitty"]:
+        look["problems"].append(f"{KITTY_TEMPLATE}: brak linii z kolorami")
+    m = re.search(r"active_border\s*=\s*\{\s*colors\s*=\s*\{([^}]*)\}\s*,\s*angle\s*=\s*(-?\d+)", read(LOOKNFEEL))
+    if m:
+        look["border"] = re.findall(r"c\.(\w+)", m.group(1))
+        look["borderAngle"] = int(m.group(2))
+    if not look["border"]:
+        look["problems"].append(f"{LOOKNFEEL}: nie rozpoznano active_border")
+    m = re.search(r'class\s*=\s*"\^\(kitty\)\$"[^\n]*opacity\s*=\s*"([0-9.]+)', read(RULES))
+    if m:
+        look["kittyOpacity"] = float(m.group(1))
+    else:
+        look["problems"].append(f"{RULES}: nie rozpoznano reguły okna kitty (opacity)")
+    return look
 
 
 def compute(item, recipe):
@@ -206,7 +247,7 @@ def main():
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
-          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe), "options": palette_recipe.options()})
+          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe), "options": palette_recipe.options(), "look": system_look()})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):

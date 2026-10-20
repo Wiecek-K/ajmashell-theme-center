@@ -22,6 +22,8 @@ Pokazuje dla każdej tapety karuzeli paletę, którą da system według Przepisu
 |---|---|
 | `shell.qml` | stan okna i protokół z pomocnikiem; `//@ pragma AppId` daje klasę okna `matugen-ajmashell-tool` |
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (z `Chip.qml`, `TrialSlider.qml`) | układ wariantu D z prototypu (gałąź `prototype/faza-e-karta-ui`): taśma z lewej, podgląd z Kandydatami i tabela w środku, panel z prawej |
+| `Previews.qml` (z `DesktopMock.qml`, `KittyMock.qml`) | makiety pulpitu (Bar + Centrum sterowania) i kitty dla Przepisu obecnego i próbnego obok siebie; obok tabeli, gdy okno jest szerokie (tabela w dwóch kolumnach + co najmniej 420 px), inaczej pod Kandydatami |
+| `Mockups.js` | jedyne miejsce mapowania tokenów na elementy makiet, z komentarzem, skąd pochodzi każde (role `Theme.qml` Ajmashella w wyglądzie `fancy2`; kitty i ramka z plików systemu, patrz niżej) |
 | `helper/tuner.py` | pomocnik: prawdziwy matugen, moduł Przepisu i kategorie z dotfiles (import po ścieżce, bez kopii) |
 
 Protokół (JSON, jeden komunikat w linii) opisany w nagłówku `helper/tuner.py`.
@@ -38,6 +40,11 @@ Zmiana tych ścieżek w Ajmashellu psuje narzędzie bez ostrzeżenia:
 - `~/.config/matugen/przepis-palety.json` (Przepis systemu),
 - `~/.cache/ajmashell/wallpapers/index.json` (lista tapet i miniatury),
 - `~/.config/hypr/current_wallpaper` (bieżąca tapeta),
+- makiety czytają przy starcie (`system_look()` w pomocniku): szablon `~/.config/matugen/templates/kitty-colors.conf`
+  (linie `klucz {{ colors.TOKEN.default.hex }}`), `active_border` z `~/.config/hypr/configs/looknfeel.lua` i krycie
+  reguły okna kitty z `~/.config/hypr/configs/rules.lua`. Gdy czegoś nie rozpozna, okno pokazuje to na czerwono nad
+  makietami, a brakujący kolor jest szary. Role Ajmashella (wyspy Bara, Centrum sterowania) są przepisane ręcznie
+  w `Mockups.js`: po zmianie `Theme.qml` popraw je tam,
 - reguła okna `matugen-ajmashell-tool` w `~/.config/hypr/configs/rules.lua` (`opacity 1.0 override`).
 
 Paleta liczona jak w systemie: Seed z miniatury flagami Przepisu (jak indexer), paleta z Seeda przez
