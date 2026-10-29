@@ -4,7 +4,7 @@ A Quickshell window for tuning the colours of [Ajmashell](https://github.com/Wie
 wallpaper of the Ajmashell carousel it shows the palette the system gives it under the palette recipe, and lets you
 try another recipe before you save it as the system one.
 
-![Ajmashell Theme Center: wallpapers on the left, candidates, mock-ups and tokens of the current and the trial recipe in the middle, the controls on the right](docs/screenshot.jpg)
+![Ajmashell Theme Center, Palette tab: tab bar at the top, wallpapers on the left, candidates, mock-ups and tokens of the current and the trial recipe in the middle, the controls on the right](docs/screenshot.jpg)
 
 It needs Ajmashell: it reads the carousel index, imports the palette recipe module from the Ajmashell install and runs
 its scripts after a save. There is no stand-alone mode.
@@ -55,7 +55,7 @@ CPU cores. The results are cached, so later starts are instant. With no wallpape
 wallpaper carousel (Super + W) once: it builds the index the tool reads.
 
 If something is missing (another Ajmashell directory, a Hyprland file elsewhere), a red line at the top of the right
-panel names it and what it stops; open Settings (see below).
+panel names it and what it stops; open the Settings tab (see below).
 
 ## Terms
 
@@ -70,8 +70,14 @@ panel names it and what it stops; open Settings (see below).
 
 ## Using it
 
-- Keys: `↑` `↓` (and `←` `→`) change the wallpaper, `Home` / `End` the first / last one, `Ctrl+,` opens or closes
-  Settings. A click on a swatch copies its hex.
+The window has tabs, in a bar at the top: **Palette** (the palette recipe, below) and, on the right edge, **Settings**
+(the paths). A dot after a tab's name ("Palette •") means its trial settings differ from the current ones and are not
+saved yet. A tab keeps its state while you are in another one (trial recipe, selected wallpaper); closing the window
+drops unsaved trial settings without asking.
+
+- Keys: `Ctrl+1`, `Ctrl+2`… pick a tab of the bar, `Ctrl+Tab` / `Ctrl+Shift+Tab` the next / previous one, `Ctrl+,`
+  opens Settings (again: back to the tab before it). In Palette, `↑` `↓` (and `←` `→`) change the wallpaper,
+  `Home` / `End` the first / last one. A click on a swatch copies its hex.
 - The controls (panel on the right) change the trial recipe: seed choice, scheme, contrast, dark palette lightness.
   Their lists and ranges come from `palette_recipe.options()`; the dark lightness has no lower limit in matugen (−∞),
   so its slider starts at −1. A request goes to the helper after 300 ms without changes (debounce). The trial is
@@ -80,11 +86,15 @@ panel names it and what it stops; open Settings (see below).
   the trial changes on that wallpaper; the second dot is the trial seed.
 - For each recipe the middle shows a desktop mock-up (Bar and control centre) and a kitty mock-up, side by side, and
   the table of all palette tokens.
-- "Settings" (top of the right panel) lists every path the tool reads, see "Settings" below.
 
 ## Saving: what changes in your system
 
-"save as system recipe" writes the trial recipe into the palette recipe file of Ajmashell,
+Each tab with trial settings has two buttons: its own save ("Save palette") and "Save all", the same in every tab.
+"Save all" saves every tab with a dot (its label names them) after a confirmation that lists what each save does;
+Esc or a click beside the box cancels. It saves the palette first, then the other tabs in the order of the bar, and
+stops at the first error; the line under the button says what was saved and what not.
+
+"Save palette" writes the trial recipe into the palette recipe file of Ajmashell,
 `~/.config/matugen/palette-recipe.json` (through `palette_recipe.save()`: validated, atomic). Then, in the background,
 it runs the carousel indexer (new seeds and colour categories, the thumbnails stay) and `wpapply.sh` on the wallpaper
 on your desktop, so the desktop takes the new colours at once. The steps show under the button. The saved recipe
@@ -96,7 +106,7 @@ back.
 
 ## Settings: the paths it needs
 
-Every path comes from the Settings panel. The defaults are the paths of an Ajmashell install from the dotfiles, so
+Every path comes from the Settings tab. The defaults are the paths of an Ajmashell install from the dotfiles, so
 such an install needs no settings. Saved in `~/.config/ajmashell-theme-center/settings.json` (`$XDG_CONFIG_HOME` if
 set), only the paths that differ from the default; no file = all defaults. A broken file gives the defaults and a
 warning in the window. "apply" saves the file and restarts the helper (the window stays); "use default" empties a
@@ -132,11 +142,14 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 
 | File | Role |
 |---|---|
-| `shell.qml` | window state and the protocol with the helper; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
+| `shell.qml` | the frame: the tab list, the tab states, "Save all" and its order, the shortcuts; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
+| `TabBar.qml`, `SaveAllButton.qml`, `SaveAllDialog.qml` | the tab bar, the "Save all" button every tab shows, its confirmation |
+| `PaletteState.qml` | state of the Palette tab and the protocol with the helper (alive for the whole window, read by the other tabs) |
+| `PaletteTab.qml` | the Palette tab: the parts below |
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
 | `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
 | `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml` in the look `fancy2`; kitty and the border from the system's files) |
-| `SettingsPanel.qml` | the Settings panel: a field per path, its default, "found" / "missing" |
+| `SettingsTab.qml`, `SettingsState.qml` | the Settings tab: a field per path, its default, "found" / "missing" |
 | `helper/tuner.py` | the helper: real matugen, the recipe module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
 | `helper/settings.py` | the paths: defaults (the one place they are written), `settings.json`, found / missing |
 | `install.sh` | install and uninstall, see above |

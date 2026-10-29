@@ -1,408 +1,188 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+pragma ComponentBehavior: Bound
 //@ pragma AppId ajmashell-theme-center
-// Ajmashell Theme Center, palette tuning (faza E, ADR 0019): shows, for every carousel wallpaper, the palette the
-// system gives it.
-// Layout = variant D of the prototype (branch prototype/faza-e-karta-ui): strip of all wallpapers on the left, the
-// selected one with its candidates and the full token table in the middle, panel on the right with the controls of the
-// trial recipe (ticket 05), and the desktop and kitty mock-ups of both recipes (ticket 06) between the table and
-// the panel, or under the candidates when the window is too narrow for both. Colours come from helper/tuner.py (real
-// matugen through the Ajmashell palette_recipe.py); this file only holds the state and the protocol. The paths of the
-// helper are set in the Settings panel (ticket 09): a change restarts the helper, the window stays.
+// Ajmashell Theme Center: the frame (ticket 12, ADR 0020). Tab bar at the top, the tabs below, "Save all" with its
+// modal. The tab list below drives all of it; a tab = a view file and a state object (or the state of another tab).
+// The states are created here at start and live until the window closes, together with the helper of PaletteState;
+// a view is created when its tab opens first, then stays alive hidden.
+// Tab state interface (read only for the frame): edited (trial differs from current), busy, save(), saving, saveError,
+// effect (one sentence for the modal), optional saveFirst, note and alert (bar), leave() (called when the tab is left).
 // Start: qs -n -p ~/Projects/ajmashell-theme-center (the .desktop entry does the same).
 import QtQuick
 import Quickshell
-import Quickshell.Io
 
 ShellRoot {
     id: root
 
+    PaletteState { id: palette; ui: center.ui }
+    SettingsState { id: settings; palette: palette }
+
     QtObject {
-        id: app
-
-        property var items: []          // [{fileName, path, thumb}] in carousel index order
-        property string current: ""     // fileName of the system's current wallpaper
-        property int sel: 0
-        readonly property var it: items.length ? items[sel] : null
-        property var recipe: null       // current recipe (the system file, validated by the helper)
-        property string fingerprint: ""
-        property var trial: null        // trial recipe: starts as a copy of the current one, changed by the controls
-        property string trialFingerprint: ""
-        // The trial is computed for the selected wallpaper only; the rest of the folder after the button
-        // "compute all wallpapers" (user, 2026-10-20). A new trial value goes back to the selected one only.
-        property bool trialAll: false
-        property var options: null      // palette_recipe.options(): rules, schemes, number ranges
-        property var look: null         // tuner.py system_look(): what the mock-ups read from the system's files
-        // results[fingerprint][fileName] = {seed, candidates, category, colors, key} or {error}; done[fingerprint] = n.
-        // Messages write them at once, rev follows at most every 80 ms (pending): one rebind of the strip and the
-        // summary per batch, not per message, so moving a control does not stall the window.
-        property var results: ({})
-        property var done: ({})
-        property int rev: 0
-        property bool pending: false
-        property string helperError: ""
-        // Saving the trial as the system palette recipe (ticket 07): saving = the file is being written;
-        // applyStage = the background steps after it ("indexer", "wallpaper", "done", "error"), shown in the panel
-        property bool saving: false
-        property string saveError: ""
-        property string applyStage: ""
-        property string applyError: ""
-        readonly property bool applying: applyStage === "indexer" || applyStage === "wallpaper"
-        readonly property bool trialEdited: JSON.stringify(trial) !== JSON.stringify(recipe)
-        property string copied: ""
-        // Settings (ticket 09): settings = settings.status() of the paths in use, problems = what each missing path
-        // stops (shown in the panel and, without wallpapers, in the middle); the panel edits draft {key: text}, the
-        // helper checks it ("checked" = status of the draft) and, on apply, saves it and restarts (restarting)
-        property var settings: []
-        property string settingsFile: ""
-        property string recipeFile: ""  // named by the recipe module, not a setting (user, 2026-10-21)
-        property string settingsWarning: ""
-        property string matugenWarning: ""   // matugen missing or not 4.2.x (ticket 11): a warning, nothing blocked
-        property var problems: []
-        property bool settingsOpen: false
-        property var draft: ({})
-        property var checked: null
-        property bool restarting: false
-        property string settingsError: ""
-        // a field holds the path only when it is not the default (s.own); empty = the default
-        readonly property bool draftEdited: {
-            for (const s of settings)
-                if ((draft[s.key] ?? "") !== s.own) return true;
-            return false;
-        }
-        readonly property bool canApply: draftEdited && !restarting && !saving && !applying
-
-        readonly property bool trialDiffers: fingerprint !== trialFingerprint
-        readonly property int total: items.length
-        // the folder summary: wallpapers with both results, of them how many get another seed / only another palette
-        readonly property var summary: {
-            rev; // dependency
-            let both = 0, seed = 0, palette = 0;
-            for (const x of items) {
-                const d = diff(x.fileName);
-                if (d === "") continue;
-                both++;
-                if (d === "seed") seed++;
-                else if (d === "palette") palette++;
-            }
-            return { both: both, seed: seed, palette: palette };
-        }
+        id: center
 
         readonly property var ui: ({ bg: "#141416", panel: "#1d1d21", line: "#2e2e34", text: "#e6e6ea", dim: "#9a9aa4",
                                      accent: "#8ab4f8", trial: "#ffb74d", error: "#ff8a80", warn: "#ffd54f", font: "Inter" })
 
-        function result(fileName, fp) {
-            rev; // dependency
-            const r = results[fp || fingerprint];
-            return r ? r[fileName] || null : null;
-        }
-
-        function doneOf(fp) {
-            rev; // dependency
-            return done[fp] || 0;
-        }
-
-        // What the trial changes on one wallpaper: "seed", "palette" (same seed, other tokens), "same", or "" while
-        // either result is missing or failed.
-        function diff(fileName) {
-            const a = result(fileName, fingerprint), b = result(fileName, trialFingerprint);
-            if (!a || !b || a.error || b.error) return "";
-            return a.seed !== b.seed ? "seed" : a.key !== b.key ? "palette" : "same";
-        }
-
-        // Selected wallpaper first, then its neighbours outwards: the strip is browsed with the arrows.
-        function order() {
-            const out = [];
-            for (let d = 0; out.length < items.length; d++) {
-                if (sel + d < items.length) out.push(items[sel + d].fileName);
-                if (d > 0 && sel - d >= 0) out.push(items[sel - d].fileName);
-            }
-            return out;
-        }
-
-        function request() {
-            if (!items.length || !recipe || restarting) return;
-            const all = order();
-            helper.write(JSON.stringify({ type: "compute", recipes: [recipe, trial],
-                                          orders: [all, trialAll ? all : all.slice(0, 1)] }) + "\n");
-        }
+        // in bar order; "right" tabs at the end. The window starts on the first one.
+        readonly property var tabs: [
+            { title: "Palette", source: "PaletteTab.qml", state: palette },
+            { title: "Settings", source: "SettingsTab.qml", state: settings, right: true }
+        ]
+        property int current: 0
+        property int previous: 0
 
         function select(i) {
-            if (i < 0 || i >= items.length || i === sel) return;
-            sel = i;
-            // same recipes: the helper moves the selected one to the front (and adds it to the trial's list)
-            if (doneOf(fingerprint) < total || doneOf(trialFingerprint) < total) request();
+            if (i < 0 || i >= tabs.length) return;
+            if (i !== current) {
+                const left = tabs[current].state;
+                if (left.leave) left.leave();
+                previous = current;
+                current = i;
+            }
+            area.open(i);
         }
 
-        function computeAll() {
-            trialAll = true;
-            debounce.stop();
-            request();
+        // Ctrl+1, Ctrl+2…: the n-th tab of the bar, not counting the right ones
+        function selectNth(n) {
+            const i = tabs.findIndex(t => !t.right && n-- === 0);
+            if (i >= 0) select(i);
         }
 
-        // A control changed one field of the trial: the request waits for the control to settle (debounce).
-        function setTrial(section, key, value) {
-            const t = JSON.parse(JSON.stringify(trial));
-            t[section][key] = value;
-            trial = t;
-            trialAll = false;
-            debounce.restart();
-        }
-
-        // The trial becomes the system palette recipe; the helper writes it through palette_recipe.save and answers
-        // "saved"
-        function saveTrial() {
-            if (saving || applying || !trialEdited) return;
-            saving = true;
-            saveError = "";
-            applyStage = "";
-            applyError = "";
-            helper.write(JSON.stringify({ type: "save", recipe: trial }) + "\n");
-        }
-
-        // A path typed in the Settings panel: the helper checks the draft after 300 ms without typing.
-        function setDraft(key, text) {
-            const d = Object.assign({}, draft);
-            d[key] = text;
-            draft = d;
-            settingsError = "";
-            checkDebounce.restart();
-        }
-
-        function checkDraft() {
-            if (!restarting) helper.write(JSON.stringify({ type: "check", paths: draft }) + "\n");
-        }
-
-        // The helper saves the settings and starts over in the same process; a new "ready" resets the window.
-        // Not while a save runs: the restart would cut its steps off.
-        function applySettings() {
-            if (!canApply) return;
-            debounce.stop();
-            restarting = true;
-            checkDebounce.stop();
-            helper.write(JSON.stringify({ type: "settings", paths: draft }) + "\n");
-        }
-
-        function discardSettings() {
-            const d = {};
-            for (const s of settings) d[s.key] = s.own;
-            draft = d;
-            checked = null;
-            settingsError = "";
-            checkDebounce.stop();
-        }
-
-        // closing the panel (button or Ctrl+,) drops what was typed and not applied
+        // Ctrl+,: Settings, or back to the tab before it
         function toggleSettings() {
-            if (settingsOpen) discardSettings();
-            settingsOpen = !settingsOpen;
+            const s = tabs.findIndex(t => t.state === settings);
+            select(current === s ? previous : s);
         }
 
-        function restore() {
-            trial = JSON.parse(JSON.stringify(recipe));
-            trialAll = false;
-            debounce.stop();
-            request();
+        // "Save all": the edited tabs, the palette first (longest, fails most often), then in bar order
+        readonly property var toSave: tabs.filter(t => t.state.edited)
+        readonly property var saveOrder: toSave.filter(t => t.state.saveFirst).concat(toSave.filter(t => !t.state.saveFirst))
+        property bool askingSaveAll: false
+        property bool saveAllRunning: false
+        readonly property bool canSaveAll: toSave.length > 0 && !saveAllRunning && !tabs.some(t => t.state.busy)
+        property var queue: []
+        property var step: null      // the tab whose save runs
+        property var log: []
+        property string saveAllMessage: ""
+        property bool saveAllFailed: false
+
+        function askSaveAll() {
+            if (canSaveAll) askingSaveAll = true;
         }
 
-        function onMessage(m) {
-            if (m.type === "ready") {
-                // also after a settings change: everything computed so far belonged to the old paths, and the
-                // trial starts again from the (maybe other) recipe file; the selected wallpaper stays if it is there
-                const before = it ? it.fileName : "";
-                results = {};
-                done = {};
-                pending = false;
-                rev++;
-                trialAll = false;
-                helperError = "";
-                saving = false;
-                saveError = "";
-                applyStage = "";
-                applyError = "";
-                restarting = false;
-                settings = m.settings;
-                settingsFile = m.settingsFile;
-                recipeFile = m.recipeFile || "";
-                settingsWarning = m.settingsWarning || "";
-                matugenWarning = m.matugenWarning || "";
-                problems = m.problems;
-                discardSettings();
-                recipe = m.recipe;
-                fingerprint = m.fingerprint || "";
-                trial = JSON.parse(JSON.stringify(m.recipe));
-                trialFingerprint = m.fingerprint || "";
-                options = m.options;
-                look = m.look;
-                current = m.current || "";
-                items = m.items;
-                const kept = items.findIndex(x => x.fileName === before);
-                sel = kept >= 0 ? kept : Math.max(0, items.findIndex(x => x.fileName === current));
-                request();
-            } else if (m.type === "accepted") {
-                fingerprint = m.fingerprints[0];
-                trialFingerprint = m.fingerprints[1];
-            } else if (m.type === "result" || m.type === "error") {
-                const r = results[m.fingerprint] || (results[m.fingerprint] = {});
-                if (m.type === "error")
-                    r[m.fileName] = { error: m.message };
-                else {
-                    m.key = Object.values(m.colors).join(","); // tokens come sorted: equal palettes, equal keys
-                    r[m.fileName] = m;
-                }
-                pending = true;
-            } else if (m.type === "saved") {
-                saving = false;
-                if (m.error) {
-                    saveError = m.error;
-                } else {
-                    // story 54: the saved recipe is the current recipe now, so the differences and the summary go;
-                    // the trial stays as it is (equal to it, unless a control moved after the click)
-                    recipe = m.recipe;
-                    fingerprint = m.fingerprint;
-                    request();
-                }
-            } else if (m.type === "apply") {
-                applyStage = m.stage;
-                applyError = m.message || "";
-            } else if (m.type === "checked") {
-                checked = m.settings;
-            } else if (m.type === "settingsSaved") {
-                restarting = false;
-                settingsError = m.error;
-            } else if (m.type === "progress") {
-                done[m.fingerprint] = m.done;
-                pending = true;
+        function cancelSaveAll() {
+            askingSaveAll = false;
+            area.open(current); // keys back to the tab
+        }
+
+        function saveAll() {
+            askingSaveAll = false;
+            area.open(current);
+            if (!canSaveAll) return;
+            queue = saveOrder.slice();
+            log = [];
+            saveAllMessage = "";
+            saveAllFailed = false;
+            saveAllRunning = true;
+            next();
+        }
+
+        // One tab after the other; a save that answers later (saving) goes on from the Connections below. Background
+        // steps after a save (the palette's indexer and wallpaper) do not hold the next tab.
+        function next() {
+            while (queue.length) {
+                step = queue[0];
+                step.state.save();
+                if (step.state.saving) return;
+                if (!stepDone()) return;
             }
+            finish();
         }
 
-        function copy(hex) {
-            Quickshell.clipboardText = hex;
-            copied = hex;
-        }
-
-        function contrastText(hex) {
-            if (!hex) return "#f2f2f2";
-            const c = Qt.color(hex);
-            return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.55 ? "#111111" : "#f2f2f2";
-        }
-    }
-
-    Timer {
-        // results to bindings in batches (see app.pending)
-        interval: 80
-        repeat: true
-        running: app.pending
-        onTriggered: {
-            app.pending = false;
-            app.rev++;
-        }
-    }
-
-    Timer {
-        // debounce of the controls: one request for the last value, not one per slider step
-        id: debounce
-        interval: 300
-        onTriggered: app.request()
-    }
-
-    Timer {
-        // the Settings panel: one check for the last text typed
-        id: checkDebounce
-        interval: 300
-        onTriggered: app.checkDraft()
-    }
-
-    Process {
-        id: helper
-        command: ["python3", Quickshell.shellDir + "/helper/tuner.py"]
-        running: true
-        stdinEnabled: true
-        stdout: SplitParser {
-            onRead: data => {
-                try {
-                    app.onMessage(JSON.parse(data));
-                } catch (e) {
-                    console.warn("tuner: bad message", e, data.slice(0, 200));
-                }
+        // false = stop: the save failed, or did not start (the tab is still edited)
+        function stepDone() {
+            const t = step;
+            const name = t.title.toLowerCase();
+            step = null;
+            queue = queue.slice(1);
+            const failed = t.state.saveError ? "error " + t.state.saveError : t.state.edited ? "not saved (busy)" : "";
+            if (!failed) {
+                log = log.concat([name + ": saved"]);
+                return true;
             }
+            log = log.concat([name + ": " + failed], queue.map(q => q.title.toLowerCase() + ": not saved"));
+            saveAllFailed = true;
+            queue = [];
+            finish();
+            return false;
         }
-        stderr: SplitParser { onRead: data => console.warn("tuner.py:", data) }
-        onExited: code => {
-            app.helperError = "The helper exited (code " + code + "), nothing is computed any more. Details: journal / terminal.";
-            // a save in flight gets no answer any more: say so instead of "saving…" for good
-            if (app.saving) app.saveError = "the helper did not answer; check the palette recipe file";
-            else if (app.applying) app.applyError = "the helper did not finish";
-            if (app.applying) app.applyStage = "error";
-            app.saving = false;
-            app.restarting = false;
+
+        function finish() {
+            saveAllRunning = false;
+            saveAllMessage = log.join(", ");
+        }
+    }
+
+    Connections {
+        target: center.step ? center.step.state : null
+        function onSavingChanged() {
+            if (center.step && !center.step.state.saving && center.stepDone()) center.next();
         }
     }
 
     FloatingWindow {
-        id: win
         title: "Ajmashell Theme Center"
         implicitWidth: 1600
         implicitHeight: 1000
-        color: app.ui.bg
+        color: center.ui.bg
         onVisibleChanged: if (!visible) Qt.quit()
 
         Item {
-            id: keys
+            // keys the active tab does not take: the frame's shortcuts
             anchors.fill: parent
-            focus: true
-            // the strip is vertical: ↑ ↓ follow it, ← → do the same
-            Keys.onUpPressed: app.select(app.sel - 1)
-            Keys.onDownPressed: app.select(app.sel + 1)
-            Keys.onLeftPressed: app.select(app.sel - 1)
-            Keys.onRightPressed: app.select(app.sel + 1)
             Keys.onPressed: e => {
-                if (e.key === Qt.Key_Comma && e.modifiers & Qt.ControlModifier) app.toggleSettings();
-                else if (e.key === Qt.Key_Home) app.select(0);
-                else if (e.key === Qt.Key_End) app.select(app.items.length - 1);
+                if (!(e.modifiers & Qt.ControlModifier)) return;
+                if (e.key === Qt.Key_Comma) center.toggleSettings();
+                else if (e.key === Qt.Key_Backtab) center.select((center.current + center.tabs.length - 1) % center.tabs.length);
+                else if (e.key === Qt.Key_Tab) center.select((center.current + 1) % center.tabs.length);
+                else if (e.key >= Qt.Key_1 && e.key <= Qt.Key_9) center.selectNth(e.key - Qt.Key_1);
+                else return;
+                e.accepted = true;
             }
 
-            Strip {
-                id: strip
-                app: app
-                width: 200
-                anchors { top: parent.top; bottom: parent.bottom; left: parent.left; margins: 8 }
+            TabBar {
+                id: bar
+                frame: center
+                anchors { top: parent.top; left: parent.left; right: parent.right }
             }
 
-            SidePanel {
-                id: side
-                app: app
-                width: 300
-                anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
+            Item {
+                id: area
+                anchors { top: bar.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
+
+                // creates the tab's view the first time, then gives it the keys
+                function open(i) {
+                    const l = views.itemAt(i) as Loader;
+                    if (!l) return;
+                    if (!l.item) l.setSource(Qt.resolvedUrl(center.tabs[i].source), { app: center.tabs[i].state, frame: center });
+                    if (l.item) (l.item as Item).forceActiveFocus();
+                }
+
+                Repeater {
+                    id: views
+                    model: center.tabs
+                    Loader {
+                        required property int index
+                        anchors.fill: parent
+                        visible: index === center.current
+                    }
+                }
+                Component.onCompleted: open(center.current)
             }
 
-            // Mock-ups beside the token table while the table keeps its two columns (980 px, TokenTable) and the
-            // mock-ups get at least 420 px (prototype); otherwise inside the view, under the candidates (tiled window).
-            readonly property real centre: width - strip.width - 2 * 8 - side.width - 2 * 16
-            readonly property bool mockupsBeside: centre - 980 - 16 >= 420
-
-            WallpaperView {
-                app: app
-                mockups: !parent.mockupsBeside
-                anchors { top: parent.top; bottom: parent.bottom; left: strip.right; right: parent.mockupsBeside ? beside.left : side.left; margins: 16 }
-            }
-
-            Flickable {
-                id: beside
-                visible: parent.mockupsBeside
-                width: visible ? Math.min(900, parent.centre - 980 - 16) : 0
-                anchors { top: parent.top; bottom: parent.bottom; right: side.left; topMargin: 16; bottomMargin: 16; rightMargin: 12 }
-                clip: true
-                contentHeight: besidePreviews.implicitHeight
-                boundsBehavior: Flickable.StopAtBounds
-                Previews { id: besidePreviews; app: app; width: beside.width }
-            }
-
-            SettingsPanel {
-                app: app
-                visible: app.settingsOpen
-                anchors { top: parent.top; bottom: parent.bottom; left: parent.left; right: side.left }
-                // a closed panel gives the keys back to the strip
-                onVisibleChanged: if (!visible) keys.forceActiveFocus()
+            SaveAllDialog {
+                frame: center
+                anchors.fill: parent
             }
         }
     }

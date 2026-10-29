@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
-// file), "restore current", "save as system recipe" with the steps after it, folder progress for both recipes,
+// file), "restore current", "Save palette" with the steps after it, folder progress for both recipes,
 // the summary of what the trial changes, the last copied hex. Lists and ranges of the controls come from the helper
-// (palette_recipe.options()), never copied here. On top: the Settings button and what each missing path stops
-// (ticket 09).
+// (palette_recipe.options()), never copied here. On top: what each missing path stops (ticket 09; the paths are set in
+// the Settings tab). "Save palette" saves this tab, "Save all" every tab (ticket 12).
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -11,6 +11,7 @@ import QtQuick.Controls
 Rectangle {
     id: p
     property var app
+    property var frame
     color: app.ui.panel
 
     readonly property var r: app.recipe
@@ -34,15 +35,6 @@ Rectangle {
             width: parent.width
             spacing: 14
 
-            Chip {
-                app: p.app
-                readonly property int missing: p.app.settings.filter(s => !s.found).length
-                label: "Settings" + (missing ? " · " + missing + " missing" : "")
-                tone: p.app.ui.accent
-                selected: p.app.settingsOpen
-                border.color: missing || p.app.settingsWarning ? p.app.ui.error : selected ? tone : p.app.ui.line
-                onClicked: p.app.toggleSettings()
-            }
             Repeater {
                 model: p.app.settingsWarning ? [p.app.settingsWarning, ...p.app.problems] : p.app.problems
                 Text {
@@ -175,13 +167,17 @@ Rectangle {
             }
 
             // story 51-55: one button, no commit; the steps after the file run in the helper's background
-            Chip {
-                app: p.app
-                label: p.app.saving ? "saving…" : "save as system recipe"
-                tone: p.app.ui.trial
-                selected: p.app.trialEdited && !p.app.saving && !p.app.applying
-                enabled: selected
-                onClicked: p.app.saveTrial()
+            Row {
+                spacing: 8
+                Chip {
+                    app: p.app
+                    label: p.app.saving ? "saving…" : "Save palette"
+                    tone: p.app.ui.trial
+                    selected: p.app.trialEdited && !p.app.saving && !p.app.applying
+                    enabled: selected
+                    onClicked: p.app.saveTrial()
+                }
+                SaveAllButton { frame: p.frame; width: col.width - x }
             }
             Text {
                 readonly property var stages: ({ indexer: "Palette recipe file saved. Rebuilding the carousel index…",
