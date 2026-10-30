@@ -5,19 +5,20 @@
 # messages, one per line. The recipe logic (validation, matugen flags, fingerprint) and the colour categories are
 # imported from the Ajmashell install by path, never copied, so the tool shows exactly what wpapply.sh and the
 # carousel indexer would do. Every path comes from the settings (settings.py, ticket 09), except the palette recipe
-# file: the module's own path (palette_recipe.DEFAULT_PATH), the one wpapply.sh and the indexer read. A missing path
+# file: the module's own path (palette_recipe.DEFAULT_PATH, the live file; without it the module's default recipe),
+# read the same way by wpapply.sh and the indexer. A missing path
 # is a message in the window, never a crash: without the Ajmashell directory nothing is computed or saved, the rest
 # still starts.
 #
 # Window -> helper (stdin):
 #   {"type": "compute", "recipes": [{...} | null, ...], "orders": [[fileName, ...], ...]}
-#       recipes = current recipe and trial recipe (null = the system palette recipe file); orders[i] = wallpapers to
+#       recipes = current recipe and trial recipe (null = the system palette recipe); orders[i] = wallpapers to
 #       compute for recipes[i], the selected one first (the trial gets only the selected one until the user asks for
 #       all).
 #       Jobs run wallpaper by wallpaper in the order of the longest list. A new request replaces the queue of the
 #       previous one: jobs it no longer names are dropped, the rest follow the new order.
 #   {"type": "save", "recipe": {...}}
-#       write the recipe as the system palette recipe (palette_recipe.save: strict validation, atomic, no commit), then
+#       write the recipe into the live palette recipe file (palette_recipe.save: strict validation, atomic), then
 #       in the background the carousel indexer and wpapply.sh on the current wallpaper (ticket 07). Saves run one at
 #       a time.
 #   {"type": "saveLook", "look": {...}}
@@ -453,8 +454,8 @@ def main():
         elif msg.get("type") == "save":
             saver.submit(save, msg.get("recipe"))
         elif msg.get("type") == "readRecipe" and palette_recipe:
-            recipe = palette_recipe.load()
-            send({"type": "recipeRead", "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe)})
+            live = palette_recipe.load()
+            send({"type": "recipeRead", "recipe": live, "fingerprint": palette_recipe.fingerprint(live)})
         elif msg.get("type") == "readLook" and look_settings:
             send({"type": "lookRead", "current": look_settings.load()})
         elif msg.get("type") == "saveLook":
