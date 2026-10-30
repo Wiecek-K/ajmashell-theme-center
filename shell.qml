@@ -21,7 +21,8 @@ ShellRoot {
         id: center
 
         readonly property var ui: ({ bg: "#141416", panel: "#1d1d21", line: "#2e2e34", text: "#e6e6ea", dim: "#9a9aa4",
-                                     accent: "#8ab4f8", trial: "#ffb74d", error: "#ff8a80", warn: "#ffd54f", font: "Inter" })
+                                     accent: "#8ab4f8", trial: "#ffb74d", error: "#ff8a80", warn: "#ffd54f", scrim: "#a0000000",
+                                     font: "Inter" })
 
         // in bar order; "right" tabs at the end. The window starts on the first one.
         readonly property var tabs: [
@@ -94,18 +95,19 @@ ShellRoot {
                 step = queue[0];
                 step.state.save();
                 if (step.state.saving) return;
-                if (!stepDone()) return;
+                if (!stepDone(false)) return;
             }
             finish();
         }
 
-        // false = stop: the save failed, or did not start (the tab is still edited)
-        function stepDone() {
+        // false = stop: the save failed, or did not start (started = it was saving; a tab still edited after a
+        // finished save only had a control moved meanwhile)
+        function stepDone(started) {
             const t = step;
             const name = t.title.toLowerCase();
             step = null;
             queue = queue.slice(1);
-            const failed = t.state.saveError ? "error " + t.state.saveError : t.state.edited ? "not saved (busy)" : "";
+            const failed = t.state.saveError ? "error " + t.state.saveError : !started && t.state.edited ? "not saved (busy)" : "";
             if (!failed) {
                 log = log.concat([name + ": saved"]);
                 return true;
@@ -117,6 +119,10 @@ ShellRoot {
             return false;
         }
 
+        function afterStep() {
+            if (step && !step.state.saving && stepDone(true)) next();
+        }
+
         function finish() {
             saveAllRunning = false;
             saveAllMessage = log.join(", ");
@@ -125,8 +131,9 @@ ShellRoot {
 
     Connections {
         target: center.step ? center.step.state : null
+        // later, not here: a tab may set saving = false before its error or its new current value
         function onSavingChanged() {
-            if (center.step && !center.step.state.saving && center.stepDone()) center.next();
+            if (center.step && !center.step.state.saving) Qt.callLater(center.afterStep);
         }
     }
 

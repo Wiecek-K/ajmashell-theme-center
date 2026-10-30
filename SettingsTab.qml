@@ -11,8 +11,8 @@ Rectangle {
     id: p
     property var app    // SettingsState
     property var frame
-    readonly property var pal: app.palette
-    color: pal.ui.bg
+    readonly property var paletteState: app.palette
+    color: paletteState.ui.bg
 
     Flickable {
         anchors { fill: parent; margins: 24 }
@@ -26,36 +26,36 @@ Rectangle {
             width: Math.min(parent.width, 900)
             spacing: 14
 
-            Text { text: "Settings"; color: p.pal.ui.accent; font { family: p.pal.ui.font; pixelSize: 18; bold: true } }
+            Text { text: "Settings"; color: p.paletteState.ui.accent; font { family: p.paletteState.ui.font; pixelSize: 18; bold: true } }
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
                 text: "Paths the tool reads from Ajmashell and the system. The defaults are those of an Ajmashell "
                       + "install from the dotfiles; change a path only if yours lives elsewhere. An empty field means "
-                      + "the default. Saved in " + p.pal.settingsFile + "."
-                color: p.pal.ui.dim
-                font { family: p.pal.ui.font; pixelSize: 12 }
+                      + "the default. Saved in " + p.paletteState.settingsFile + "."
+                color: p.paletteState.ui.dim
+                font { family: p.paletteState.ui.font; pixelSize: 12 }
             }
             Text {
-                visible: p.pal.settingsWarning !== ""
+                visible: p.paletteState.settingsWarning !== ""
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: p.pal.settingsWarning
-                color: p.pal.ui.error
-                font { family: p.pal.ui.font; pixelSize: 12 }
+                text: p.paletteState.settingsWarning
+                color: p.paletteState.ui.error
+                font { family: p.paletteState.ui.font; pixelSize: 12 }
             }
 
             Repeater {
                 // the paths in use: the model changes only with a new "ready", so a field keeps its focus while typing
-                model: p.pal.settings
+                model: p.paletteState.settings
                 Column {
                     id: row
                     required property var modelData
                     required property int index
                     readonly property string key: modelData.key
                     // status of the draft once the helper checked it (same order), else of the path in use
-                    readonly property var st: p.pal.checked ? p.pal.checked[index] : modelData
-                    readonly property string typed: p.pal.draft[row.key] ?? ""
+                    readonly property var st: p.paletteState.checked ? p.paletteState.checked[index] : modelData
+                    readonly property string typed: p.paletteState.draft[row.key] ?? ""
                     width: col.width
                     spacing: 4
 
@@ -63,13 +63,13 @@ Rectangle {
                         spacing: 10
                         Text {
                             text: row.modelData.label
-                            color: p.pal.ui.text
-                            font { family: p.pal.ui.font; pixelSize: 13; bold: true }
+                            color: p.paletteState.ui.text
+                            font { family: p.paletteState.ui.font; pixelSize: 13; bold: true }
                         }
                         Text {
                             text: row.st.found ? "found" : "missing"
-                            color: row.st.found ? p.pal.ui.dim : p.pal.ui.error
-                            font { family: p.pal.ui.font; pixelSize: 12; bold: !row.st.found }
+                            color: row.st.found ? p.paletteState.ui.dim : p.paletteState.ui.error
+                            font { family: p.paletteState.ui.font; pixelSize: 12; bold: !row.st.found }
                         }
                     }
                     TextField {
@@ -78,29 +78,29 @@ Rectangle {
                         placeholderText: row.modelData.default
                         selectByMouse: true
                         font { family: "monospace"; pixelSize: 13 }
-                        color: p.pal.ui.text
-                        placeholderTextColor: p.pal.ui.dim
+                        color: p.paletteState.ui.text
+                        placeholderTextColor: p.paletteState.ui.dim
                         background: Rectangle {
-                            color: p.pal.ui.panel
+                            color: p.paletteState.ui.panel
                             radius: 4
-                            border.color: row.st.found ? p.pal.ui.line : p.pal.ui.error
+                            border.color: row.st.found ? p.paletteState.ui.line : p.paletteState.ui.error
                         }
-                        onTextEdited: p.pal.setDraft(row.key, text)
+                        onTextEdited: p.paletteState.setDraft(row.key, text)
                     }
                     Row {
                         spacing: 10
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "default: " + row.modelData.default
-                            color: p.pal.ui.dim
+                            color: p.paletteState.ui.dim
                             font { family: "monospace"; pixelSize: 11 }
                         }
                         Chip {
                             visible: row.typed !== ""
-                            app: p.pal
+                            app: p.paletteState
                             label: "use default"
-                            tone: p.pal.ui.accent
-                            onClicked: p.pal.setDraft(row.key, "")
+                            tone: p.paletteState.ui.accent
+                            onClicked: p.paletteState.setDraft(row.key, "")
                         }
                     }
                     Text {
@@ -108,8 +108,8 @@ Rectangle {
                         width: row.width
                         wrapMode: Text.Wrap
                         text: row.st.problem || ""
-                        color: p.pal.ui.error
-                        font { family: p.pal.ui.font; pixelSize: 12 }
+                        color: p.paletteState.ui.error
+                        font { family: p.paletteState.ui.font; pixelSize: 12 }
                     }
                 }
             }
@@ -121,15 +121,15 @@ Rectangle {
                 spacing: 4
                 Text {
                     text: "Palette recipe file"
-                    color: p.pal.ui.text
-                    font { family: p.pal.ui.font; pixelSize: 13; bold: true }
+                    color: p.paletteState.ui.text
+                    font { family: p.paletteState.ui.font; pixelSize: 13; bold: true }
                 }
                 Text {
                     width: parent.width
                     wrapMode: Text.Wrap
-                    text: p.pal.recipeFile ? p.pal.recipeFile + "   (named by palette_recipe.py of the Ajmashell directory)"
+                    text: p.paletteState.recipeFile ? p.paletteState.recipeFile + "   (named by palette_recipe.py of the Ajmashell directory)"
                           : "unknown: no palette recipe module in the Ajmashell directory"
-                    color: p.pal.recipeFile ? p.pal.ui.dim : p.pal.ui.error
+                    color: p.paletteState.recipeFile ? p.paletteState.ui.dim : p.paletteState.ui.error
                     font { family: "monospace"; pixelSize: 12 }
                 }
             }
@@ -137,29 +137,29 @@ Rectangle {
             Row {
                 spacing: 8
                 Chip {
-                    app: p.pal
-                    label: p.pal.restarting ? "applying…" : "apply"
-                    tone: p.pal.ui.accent
-                    selected: p.pal.canApply
+                    app: p.paletteState
+                    label: p.paletteState.restarting ? "applying…" : "apply"
+                    tone: p.paletteState.ui.accent
+                    selected: p.paletteState.canApply
                     enabled: selected
-                    onClicked: p.pal.applySettings()
+                    onClicked: p.paletteState.applySettings()
                 }
                 Chip {
-                    app: p.pal
+                    app: p.paletteState
                     label: "discard changes"
-                    tone: p.pal.ui.accent
-                    enabled: p.pal.draftEdited && !p.pal.restarting
-                    onClicked: p.pal.discardSettings()
+                    tone: p.paletteState.ui.accent
+                    enabled: p.paletteState.draftEdited && !p.paletteState.restarting
+                    onClicked: p.paletteState.discardSettings()
                 }
             }
             Text {
                 visible: text !== ""
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: p.pal.settingsError ? "Not saved: " + p.pal.settingsError
-                      : p.pal.saving || p.pal.applying ? "A save of the palette recipe is running; apply after it." : ""
-                color: p.pal.settingsError ? p.pal.ui.error : p.pal.ui.dim
-                font { family: p.pal.ui.font; pixelSize: 12 }
+                text: p.paletteState.settingsError ? "Not saved: " + p.paletteState.settingsError
+                      : p.paletteState.saving || p.paletteState.applying ? "A save of the palette recipe is running; apply after it." : ""
+                color: p.paletteState.settingsError ? p.paletteState.ui.error : p.paletteState.ui.dim
+                font { family: p.paletteState.ui.font; pixelSize: 12 }
             }
         }
     }

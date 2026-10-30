@@ -11,7 +11,7 @@ Item {
     property var app    // PaletteState
     property var frame
 
-    // the strip is vertical: ↑ ↓ follow it, ← → do the same; keys with Ctrl go on to the frame
+    // the strip is vertical: ↑ ↓ follow it, ← → do the same; other keys go on to the frame (its Ctrl shortcuts)
     Keys.onUpPressed: app.select(app.sel - 1)
     Keys.onDownPressed: app.select(app.sel + 1)
     Keys.onLeftPressed: app.select(app.sel - 1)

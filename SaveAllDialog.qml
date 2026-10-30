@@ -9,7 +9,7 @@ Rectangle {
     id: d
     property var frame
     visible: frame.askingSaveAll
-    color: "#a0000000"
+    color: frame.ui.scrim
     onVisibleChanged: if (visible) forceActiveFocus()
 
     // every key stays here while the modal is open: no tab or frame shortcut behind it
