@@ -184,6 +184,15 @@ class Helper(unittest.TestCase):
         self.assertEqual(ready["recipe"], NEUTRAL)
         self.assertFalse(any(self.recipe_file in p for p in ready["problems"]), ready["problems"])
 
+    def test_bad_field_of_the_live_recipe_is_a_warning_in_the_window(self):
+        self.write(self.recipe_file, {"palette": {"scheme": "scheme-vibrnat"}})
+        ready = self.start()
+        self.assertEqual(ready["recipe"], NEUTRAL)  # the default recipe's value
+        self.assertTrue(any("palette.scheme" in w for w in ready["recipeWarnings"]), ready["recipeWarnings"])
+        self.write(self.recipe_file, VIBRANT)  # fixed by hand: the warning goes
+        self.send({"type": "readRecipe"})
+        self.assertEqual(self.expect("recipeRead")["recipeWarnings"], [])
+
     def test_read_recipe_follows_a_change_made_outside_the_tool(self):
         self.assertEqual(self.start()["recipe"], VIBRANT)
         os.remove(self.recipe_file)  # deleted by hand: the system is on the default recipe now

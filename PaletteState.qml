@@ -21,6 +21,7 @@ Scope {
     property int sel: 0
     readonly property var it: items.length ? items[sel] : null
     property var recipe: null       // current recipe (the live file over Ajmashell's default recipe, validated by the helper)
+    property var recipeWarnings: [] // what the recipe module said about a bad field, as the side panel shows it
     property string fingerprint: ""
     property var trial: null        // trial recipe: starts as a copy of the current one, changed by the controls
     property string trialFingerprint: ""
@@ -224,6 +225,7 @@ Scope {
             problems = m.problems;
             discardSettings();
             recipe = m.recipe;
+            recipeWarnings = m.recipeWarnings || [];
             fingerprint = m.fingerprint || "";
             trial = JSON.parse(JSON.stringify(m.recipe));
             trialFingerprint = m.fingerprint || "";
@@ -238,6 +240,7 @@ Scope {
             // the live file changed outside the tool (a hand edit, a delete): the trial follows unless it was edited
             const follow = !trialEdited;
             recipe = m.recipe;
+            recipeWarnings = m.recipeWarnings || [];
             fingerprint = m.fingerprint;
             if (follow) {
                 trial = JSON.parse(JSON.stringify(m.recipe));

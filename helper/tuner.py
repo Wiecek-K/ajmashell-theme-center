@@ -34,6 +34,7 @@
 # Helper -> window (stdout):
 #   {"type": "ready", "items": [{fileName, path, thumb}], "current": fileName | null,
 #    "recipe": {...} | null, "fingerprint": fp | null,   (null: no recipe module, see "problems")
+#    "recipeWarnings": [text],   (palette_recipe.load's warnings: a bad field of the live file or the default recipe)
 #    "options": {rules, schemes, contrast: [lo, hi], lightnessDark: [lo, hi]} | null,   (palette_recipe.options())
 #    "look": {"kitty": {key: token}, "border": [token], "borderAngle": deg, "kittyOpacity": a, "problems": [text]},
 #       (system_look(): what the mock-ups read from the system's own files, see there)
@@ -56,8 +57,8 @@
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #   {"type": "lookSaved", "look": {...}} | {"type": "lookSaved", "error": text}   (live look file written or not)
 #   {"type": "lookRead", "current": {...}}   (look_settings.load() after "readLook"; nothing without the module)
-#   {"type": "recipeRead", "recipe": {...}, "fingerprint"}   (palette_recipe.load() after "readRecipe"; nothing
-#       without the module)
+#   {"type": "recipeRead", "recipe": {...}, "fingerprint", "recipeWarnings": [text]}   (palette_recipe.load() after
+#       "readRecipe"; nothing without the module)
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in $XDG_CACHE_HOME/ajmashell-theme-center
 # (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this
@@ -106,6 +107,13 @@ def matugen(args):
         lines = [re.sub(r"\x1b\[[0-9;]*m", "", ln).strip() for ln in (r.stderr or r.stdout).splitlines()]
         raise RuntimeError(next((ln for ln in lines if ln), f"matugen exit {r.returncode}"))
     return r.stdout
+
+
+def system_recipe():
+    """(recipe, warnings): the recipe as the system reads it now and the module's warnings about bad fields, for the
+    window (ticket E15)."""
+    warnings = []
+    return palette_recipe.load(warnings=warnings), warnings
 
 
 def validated(recipe):
@@ -427,11 +435,11 @@ def main():
     os.makedirs(CACHE, exist_ok=True)
     items = load_items()
     current = current_wallpaper()
-    recipe = palette_recipe.load() if palette_recipe else None
+    recipe, recipe_warnings = system_recipe() if palette_recipe else (None, [])
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
-          "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe) if recipe else None,
+          "recipe": recipe, "recipeWarnings": recipe_warnings, "fingerprint": palette_recipe.fingerprint(recipe) if recipe else None,
           "options": palette_recipe.options() if palette_recipe else None, "look": system_look(),
           "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
           "recipeFile": palette_recipe.DEFAULT_PATH if palette_recipe else None,
@@ -454,8 +462,9 @@ def main():
         elif msg.get("type") == "save":
             saver.submit(save, msg.get("recipe"))
         elif msg.get("type") == "readRecipe" and palette_recipe:
-            live = palette_recipe.load()
-            send({"type": "recipeRead", "recipe": live, "fingerprint": palette_recipe.fingerprint(live)})
+            live, warnings = system_recipe()
+            send({"type": "recipeRead", "recipe": live, "fingerprint": palette_recipe.fingerprint(live),
+                  "recipeWarnings": warnings})
         elif msg.get("type") == "readLook" and look_settings:
             send({"type": "lookRead", "current": look_settings.load()})
         elif msg.get("type") == "saveLook":

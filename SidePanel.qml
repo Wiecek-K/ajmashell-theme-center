@@ -56,7 +56,7 @@ Rectangle {
             }
 
             Text { text: "Current recipe"; color: p.app.ui.accent; font { family: p.app.ui.font; pixelSize: 14; bold: true } }
-            Text { text: "the system palette recipe file"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
+            Text { text: "the live recipe file, or Ajmashell's default recipe without it"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
             Grid {
                 columns: 2
                 columnSpacing: 12
@@ -76,6 +76,18 @@ Rectangle {
                         color: index % 2 ? p.app.ui.text : p.app.ui.dim
                         font { family: p.app.ui.font; pixelSize: 12 }
                     }
+                }
+            }
+            Repeater {
+                // a bad field of the live file or of the default recipe, read as Ajmashell reads it (ticket E15)
+                model: p.app.recipeWarnings
+                Text {
+                    required property string modelData
+                    width: col.width
+                    wrapMode: Text.Wrap
+                    text: modelData.replace(/^palette_recipe: /, "")
+                    color: p.app.ui.warn
+                    font { family: p.app.ui.font; pixelSize: 12 }
                 }
             }
 
