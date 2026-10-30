@@ -5,8 +5,8 @@
 //
 // - Ajmashell (Bar, popup): roles of ~/.config/quickshell/ajmashell/singletons/theme/Theme.qml, which reads the
 //   tokens written by the matugen template ajmashell-colors.json. Theme.qml is QML bindings, so its roles are
-//   copied here by hand (with the alphas); the popup is the control centre in the look `fancy2`
-//   (singletons/look/Look.qml, the look a shell restart starts with).
+//   copied here by hand (with the alphas); the desktop mock-up's popup is the control centre in the preset `fancy2`
+//   (the starting defaults of singletons/look/look-options.json); the Look tab draws the real look (look() below).
 // - kitty: not copied. The helper reads the matugen template kitty-colors.conf on start (tuner.py system_look())
 //   and sends {kitty key: token}; kitty() below only turns a kitty key into a colour.
 // - Hyprland: the tokens and the angle of `active_border` (configs/looknfeel.lua) and the opacity of the kitty
@@ -44,6 +44,40 @@ function desktop(c) {
         pillOffText: g("on_surface"),
         separatorLine: alpha(g("on_surface"), 0.12),    // control.separator
         critical: g("error")                            // notifications.critical
+    };
+}
+
+// The look mock-ups of the Look tab (ticket 13): the Orbita and the Centrum sterowania for one palette c and one look
+// p = {background, alpha, motion, flare, glass, softPills} (look-options.json of Ajmashell). Roles and alphas of
+// Theme.orbit and Theme.control (copied, see above); the background is the look's own role and alpha, as
+// Look.background in singletons/look/Look.qml.
+function look(c, p) {
+    const g = token => c && c[token] ? c[token] : "transparent";
+    return {
+        background: p ? alpha(g(p.background), p.alpha) : "transparent",
+        text: g("on_surface"),                          // orbit.text = control.text
+        subtext: g("on_surface_variant"),               // orbit.subtext
+        node: g("surface_container_high"),              // orbit.node: known network or device
+        unknownBorder: g("outline_variant"),            // orbit.unknownBorder (unknown = outline only)
+        unknownText: g("on_surface_variant"),           // orbit.unknownText
+        connected: g("primary_fixed"),                  // orbit.connected
+        connectedText: g("on_primary_fixed"),           // orbit.connectedText
+        selected: g("primary"),                         // orbit.selected: ring of the chosen node
+        core: g("surface_container_highest"),           // orbit.core
+        glassCore: alpha(g("surface_container_highest"), 0.45), // orbit.glassAlpha
+        fade: g("surface_container_highest"),           // orbit.fadeStops: [0, 0.75], [0.45, 0.6], [1, 0] of core
+        tab: g("primary"),                              // orbit.tab: current tab, slider fill, switch on
+        tabText: g("on_primary"),                       // orbit.tabText
+        button: g("secondary_container"),               // orbit.button: a pill that is not soft
+        buttonText: g("on_secondary_container"),        // orbit.buttonText
+        softActive: alpha(g("primary"), 0.25),          // Pill.qml soft, active (orbit.softPill.active)
+        softIdle: alpha(g("on_surface"), 0.07),         // soft, idle (orbit.softPill.idle) = control.track
+        track: alpha(g("on_surface"), 0.07),            // control.track
+        separator: alpha(g("on_surface"), 0.12),        // control.separator
+        flareSource: g("on_surface"),                   // orbit.flareSource / flareGlow / flareAccent / flareGhost
+        flareGlow: g("primary"),
+        flareAccent: g("tertiary"),
+        flareGhost: g("secondary")
     };
 }
 

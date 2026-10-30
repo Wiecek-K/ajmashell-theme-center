@@ -20,6 +20,9 @@
 #       write the recipe as the system palette recipe (palette_recipe.save: strict validation, atomic, no commit), then
 #       in the background the carousel indexer and wpapply.sh on the current wallpaper (ticket 07). Saves run one at
 #       a time.
+#   {"type": "saveLook", "look": {...}}
+#       write the look as Ajmashell's live look file (look_settings.save: strict validation, atomic); Ajmashell watches
+#       the file and changes at once (ticket 13).
 #   {"type": "check", "paths": {key: text}}   status of paths typed in the Settings panel, nothing saved
 #   {"type": "settings", "paths": {key: text}}
 #       save the settings (settings.save: atomic, an empty path = the default), then the helper restarts itself in the
@@ -35,7 +38,10 @@
 #    "recipeFile": path | null,   (palette_recipe.DEFAULT_PATH of the module in use; null without the module)
 #    "settingsFile": path, "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
 #    "problems": [text],   (each missing path with what it stops; shown in the window)
-#    "matugenWarning": text | null}   (matugen missing or not 4.2.x: shown in the window, nothing blocked)
+#    "matugenWarning": text | null,   (matugen missing or not 4.2.x: shown in the window, nothing blocked)
+#    "lookSettings": {"options": {...}, "current": {...}, "file": path} | null}
+#       (the Look tab, ticket 13: look_settings.options() and load() of <ajmashellDir>/singletons/look; null without
+#       the module, see "problems")
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
 #   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
@@ -44,6 +50,7 @@
 #   {"type": "progress", "fingerprint", "done": n, "total": n}   (per recipe; total = all wallpapers)
 #   {"type": "saved", "recipe": {...}, "fingerprint"} | {"type": "saved", "error": text}   (file written or not)
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
+#   {"type": "lookSaved", "look": {...}} | {"type": "lookSaved", "error": text}   (live look file written or not)
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in $XDG_CACHE_HOME/ajmashell-theme-center
 # (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this
@@ -69,10 +76,12 @@ WORKERS = max(1, (os.cpu_count() or 2) // 2)
 TESTED_MATUGEN = "4.2.0"  # any 4.2.x is fine; another version gives a warning in the window
 TESTED_NOTE = f"tested with matugen {TESTED_MATUGEN}, results may differ"
 NO_MODULE = "the Ajmashell directory has no palette recipe module (see Settings)"
+NO_LOOK_MODULE = "the Ajmashell directory has no look module (singletons/look/look_settings.py; see Settings)"
 
 PATHS = {}              # settings.load(): key -> path
 palette_recipe = None   # <ajmashellDir>/wallpaper/palette_recipe.py, imported in main()
 indexer = None          # <ajmashellDir>/wallpaper/indexer.py (color_bucket: carousel thresholds = colour category)
+look_settings = None    # <ajmashellDir>/singletons/look/look_settings.py (the Look tab), imported in main()
 
 out_lock = threading.Lock()
 
@@ -315,6 +324,24 @@ def save(recipe):
     send({"type": "apply", "stage": "error", "message": err} if err else {"type": "apply", "stage": "done"})
 
 
+def save_look(look):
+    """The Look tab's trial becomes Ajmashell's look: the live file only (ADR 0021); Ajmashell applies it itself."""
+    if look_settings is None:
+        send({"type": "lookSaved", "error": NO_LOOK_MODULE})
+        return
+    try:
+        valid = look_settings.save(look)
+    except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for "lookSaved" forever)
+        send({"type": "lookSaved", "error": str(e) or type(e).__name__})
+        return
+    send({"type": "lookSaved", "look": valid})
+
+
+def look_state():
+    """The Look tab's part of "ready": options, the look in the live file (defaults without it) and the file."""
+    return {"options": look_settings.options(), "current": look_settings.load(), "file": look_settings.DEFAULT_PATH}
+
+
 def matugen_warning():
     """None for matugen 4.2.x, else the text for the window (ticket 11). Other versions may build other palettes from
     the same flags; the tool still runs (no block), and without matugen only the computing stops."""
@@ -334,6 +361,23 @@ def matugen_warning():
 def current_wallpaper():
     link = PATHS["currentWallpaper"]
     return os.path.realpath(link) if os.path.exists(link) else None
+
+
+def load_look_module():
+    """Import look_settings from the Ajmashell directory of the settings; None, or the reason it is missing. Apart from
+    the palette: an Ajmashell from before ticket 13 still has its palette tuned."""
+    global look_settings
+    folder = os.path.join(PATHS["ajmashellDir"], "singletons", "look")
+    if not os.path.isfile(os.path.join(folder, "look_settings.py")):
+        return NO_LOOK_MODULE if os.path.isdir(PATHS["ajmashellDir"]) else None  # no directory: status() says it
+    sys.path.insert(0, folder)
+    try:
+        look_settings = importlib.import_module("look_settings")
+        look_settings.options()  # look-options.json next to it
+    except Exception as e:  # noqa: BLE001  (a broken module of another version must not stop the window)
+        look_settings = None
+        return f"{folder}: the look module cannot be loaded ({type(e).__name__}: {e}); the Look tab is off"
+    return None
 
 
 def load_modules():
@@ -367,6 +411,9 @@ def main():
     module_error = load_modules()
     if module_error:
         problems.append(module_error)
+    look_error = load_look_module()
+    if look_error:
+        problems.append(look_error)
     os.makedirs(CACHE, exist_ok=True)
     items = load_items()
     current = current_wallpaper()
@@ -381,7 +428,8 @@ def main():
           "options": palette_recipe.options() if palette_recipe else None, "look": system_look(),
           "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
           "recipeFile": palette_recipe.DEFAULT_PATH if palette_recipe else None,
-          "problems": problems, "matugenWarning": matugen_warning()})
+          "problems": problems, "matugenWarning": matugen_warning(),
+          "lookSettings": look_state() if look_settings else None})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
@@ -398,6 +446,8 @@ def main():
             queue.request([validated(r) for r in recipes], [*orders, *[[]] * (len(recipes) - len(orders))])
         elif msg.get("type") == "save":
             saver.submit(save, msg.get("recipe"))
+        elif msg.get("type") == "saveLook":
+            save_look(msg.get("look"))  # one small file: at once, not behind a palette save
         elif msg.get("type") == "check":
             try:
                 send({"type": "checked", "settings": settings.status(settings.resolve(msg.get("paths") or {}))})

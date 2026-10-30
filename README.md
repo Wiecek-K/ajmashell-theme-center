@@ -70,8 +70,8 @@ panel names it and what it stops; open the Settings tab (see below).
 
 ## Using it
 
-The window has tabs, in a bar at the top: **Palette** (the palette recipe, below) and, on the right edge, **Settings**
-(the paths). A dot after a tab's name ("Palette •") means its trial settings differ from the current ones and are not
+The window has tabs, in a bar at the top: **Palette** (the palette recipe, below), **Look** (the look of Ajmashell's
+big popups, below) and, on the right edge, **Settings** (the paths). A dot after a tab's name ("Palette •") means its trial settings differ from the current ones and are not
 saved yet. A tab keeps its state while you are in another one (trial recipe, selected wallpaper); closing the window
 drops unsaved trial settings without asking.
 
@@ -86,6 +86,14 @@ drops unsaved trial settings without asking.
   the trial changes on that wallpaper; the second dot is the trial seed.
 - For each recipe the middle shows a desktop mock-up (Bar and control centre) and a kitty mock-up, side by side, and
   the table of all palette tokens.
+- **Look** sets the look of Ajmashell's seven big popups (Orbita, launcher, control centre, audio, calendar, media,
+  Keybinds; one background for all): presets `basic`, `fancy`, `fancy2`, `still` and a builder (background role, alpha
+  0.5–1, motion, lens flare, glass core, soft pills). A click on a preset fills the builder; any change makes it
+  "custom". The roles, the alpha range and the presets come from Ajmashell's `singletons/look/look-options.json`
+  (through `look_settings.options()`), never copied here; a blue frame marks the current value. Two previews side by
+  side, for the wallpaper selected in Palette: the current look on the current palette recipe and the trial look on
+  the trial palette recipe, each with the Orbita and the control centre on a blurred piece of the wallpaper (a still
+  frame: "motion" in the caption when the look moves).
 
 ## Saving: what changes in your system
 
@@ -104,6 +112,11 @@ Nothing is committed. If your Ajmashell lives in a dotfiles git repository, `pal
 changed file: commit it yourself when you like the result, or `git checkout` it (then apply a wallpaper again) to go
 back.
 
+"Save look" writes the trial look into Ajmashell's live look file, `~/.local/state/ajmashell/look.json` (through
+`look_settings.save()`: validated, atomic). Ajmashell watches the file and changes its popups at once; the file is
+outside git, so trying a look leaves no trace in the dotfiles. Delete the file to go back to Ajmashell's defaults.
+New defaults or a new preset are a change in Ajmashell's `look-options.json`, never made by this tool.
+
 ## Settings: the paths it needs
 
 Every path comes from the Settings tab. The defaults are the paths of an Ajmashell install from the dotfiles, so
@@ -114,7 +127,7 @@ field. While you type, each field shows "found" or "missing".
 
 | Setting | Default | Without it |
 |---|---|---|
-| Ajmashell directory | `~/.config/quickshell/ajmashell` | needs `wallpaper/palette_recipe.py` (`load`, `save`, `seed_flags`, `palette_flags`, `fingerprint`, `options`) and `wallpaper/indexer.py` (`color_bucket`, the colour category; run after a save). Without them nothing is computed or saved |
+| Ajmashell directory | `~/.config/quickshell/ajmashell` | needs `wallpaper/palette_recipe.py` (`load`, `save`, `seed_flags`, `palette_flags`, `fingerprint`, `options`) and `wallpaper/indexer.py` (`color_bucket`, the colour category; run after a save). Without them nothing is computed or saved. The Look tab needs `singletons/look/look_settings.py` (`load`, `save`, `options`, `DEFAULT_PATH`) and its `look-options.json`; without them only that tab is off |
 | Carousel wallpaper index | `~/.cache/ajmashell/wallpapers/index.json` | no wallpapers: open the wallpaper carousel (Super + W) once to build it |
 | Current wallpaper link | `~/.config/hypr/current_wallpaper` | no wallpaper marked "on desktop"; a save cannot apply the palette |
 | kitty colour template | `~/.config/matugen/templates/kitty-colors.conf` | the kitty mock-up is off (lines `key {{ colors.TOKEN.default.hex }}`) |
@@ -148,9 +161,11 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 | `PaletteTab.qml` | the Palette tab: the parts below |
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
 | `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
-| `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml` in the look `fancy2`; kitty and the border from the system's files) |
+| `LookState.qml` | state of the Look tab: the current and the trial look, presets, "Save look" (through the helper of `PaletteState`) |
+| `LookTab.qml`, `LookPresets.qml`, `LookMock.qml` | the Look tab: previews of both looks, the presets and the builder, the Orbita and control centre mock-up |
+| `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml`; the look's background from the look; kitty and the border from the system's files) |
 | `SettingsTab.qml`, `SettingsState.qml` | the Settings tab: a field per path, its default, "found" / "missing" |
-| `helper/tuner.py` | the helper: real matugen, the recipe module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
+| `helper/tuner.py` | the helper: real matugen, the recipe module, the look module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
 | `helper/settings.py` | the paths: defaults (the one place they are written), `settings.json`, found / missing |
 | `install.sh` | install and uninstall, see above |
 | `ajmashell-theme-center.desktop` | the launcher entry `install.sh` installs |
@@ -173,8 +188,8 @@ they stay Polish. Everything else in the window is English.
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
 - `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
   recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the
-  helper restarts in the same process), missing paths as messages, a save with its steps, the matugen version warning.
-  Everything runs in a temporary directory with a copy of the real `palette_recipe.py` (from `$AJMASHELL_DIR` or
+  helper restarts in the same process), missing paths as messages, a save with its steps, the matugen version warning, the look in `ready` and `saveLook`.
+  Everything runs in a temporary directory with copies of the real `palette_recipe.py` and `look_settings.py` (from `$AJMASHELL_DIR` or
   `~/.config/quickshell/ajmashell`; the tests skip without it), stand-ins for `indexer.py` and `wpapply.sh`, and a
   stand-in `matugen` that only answers `--version`; no palette is computed. A helper that does not report its
   settings stops the test before any message, so a test never saves into the real recipe file.

@@ -4,7 +4,9 @@
 # Ajmashell directories, each with a copy of the real palette_recipe.py (the recipe logic is Ajmashell's, never copied
 # into this repo) whose DEFAULT_PATH points to a file in the temporary directory, and a stub indexer.py. Nothing here
 # calls matugen: the index is empty, so no palette is computed.
-# The real palette_recipe.py comes from $AJMASHELL_DIR or ~/.config/quickshell/ajmashell; without it the tests skip.
+# The same for the look (ticket 13): a copy of the real look_settings.py and look-options.json, its DEFAULT_PATH (the
+# live file) in the temporary directory.
+# The real modules come from $AJMASHELL_DIR or ~/.config/quickshell/ajmashell; without them the tests skip.
 import json
 import os
 import queue
@@ -17,8 +19,9 @@ import threading
 import unittest
 
 HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "helper", "tuner.py")
-RECIPE_MODULE = os.path.join(os.environ.get("AJMASHELL_DIR") or os.path.expanduser("~/.config/quickshell/ajmashell"),
-                             "wallpaper", "palette_recipe.py")
+AJMASHELL = os.environ.get("AJMASHELL_DIR") or os.path.expanduser("~/.config/quickshell/ajmashell")
+RECIPE_MODULE = os.path.join(AJMASHELL, "wallpaper", "palette_recipe.py")
+LOOK_MODULE = os.path.join(AJMASHELL, "singletons", "look", "look_settings.py")
 
 # Stand-in indexer: the colour category the helper imports, and a run that leaves a trace for the save test
 STUB_INDEXER = '''import os, sys
@@ -32,12 +35,19 @@ VIBRANT = {"seed": {"rule": "darkness"},
            "palette": {"scheme": "scheme-vibrant", "contrast": 0.5, "lightnessDark": 0.0}}
 
 
-@unittest.skipUnless(os.path.isfile(RECIPE_MODULE), f"no {RECIPE_MODULE}")
+# a look other than the defaults (fancy2), so a test sees the file was read
+STILL = {"background": "on_primary_fixed", "alpha": 0.9, "motion": False, "flare": True, "glass": True,
+         "softPills": True}
+
+
+@unittest.skipUnless(os.path.isfile(RECIPE_MODULE) and os.path.isfile(LOOK_MODULE), f"no {RECIPE_MODULE} or {LOOK_MODULE}")
 class Helper(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.recipe_file = self.path("palette-recipe.json")
         self.write(self.recipe_file, VIBRANT)
+        self.look_file = self.path("state/look.json")
+        self.write(self.look_file, STILL)
         self.shell = self.stand_in("ajmashell", self.recipe_file)
         self.index = self.path("index.json")
         self.write(self.index, {"items": []})
@@ -71,6 +81,15 @@ class Helper(unittest.TestCase):
             f.write(code)
         with open(os.path.join(folder, "wallpaper", "indexer.py"), "w") as f:
             f.write(STUB_INDEXER)
+        look_dir = os.path.join(folder, "singletons", "look")
+        os.makedirs(look_dir)
+        shutil.copy(os.path.join(os.path.dirname(LOOK_MODULE), "look-options.json"), look_dir)
+        with open(LOOK_MODULE) as f:
+            code, n = re.subn(r"^DEFAULT_PATH = .*$", f"DEFAULT_PATH = {self.look_file!r}", f.read(), flags=re.M)
+        if n != 1:
+            self.fail(f"{LOOK_MODULE}: no single DEFAULT_PATH line to point at the temporary directory")
+        with open(os.path.join(look_dir, "look_settings.py"), "w") as f:
+            f.write(code)
         return folder
 
     def path(self, name):
@@ -249,6 +268,43 @@ class Helper(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.shell, "wallpaper", "indexer-ran")))
         with open(trace) as f:
             self.assertEqual(f.read(), wallpaper)
+
+    def test_ready_has_the_look_and_its_options(self):
+        look = self.start()["lookSettings"]
+        self.assertEqual(look["current"], STILL)
+        self.assertEqual(look["file"], self.look_file)
+        self.assertEqual(list(look["options"]["presets"]), ["basic", "fancy", "fancy2", "still"])
+        self.assertIn("on_primary_fixed", look["options"]["roles"])
+
+    def test_no_live_file_gives_the_defaults(self):
+        os.remove(self.look_file)
+        look = self.start()["lookSettings"]
+        self.assertEqual(look["current"], look["options"]["defaults"])
+
+    def test_ajmashell_without_the_look_module_is_a_message_not_a_crash(self):
+        os.remove(os.path.join(self.shell, "singletons", "look", "look_settings.py"))
+        ready = self.start()
+        self.assertIsNone(ready["lookSettings"])
+        self.assertIsNotNone(ready["recipe"])  # the palette still works
+        self.assertTrue(any("look" in p for p in ready["problems"]))
+        self.send({"type": "saveLook", "look": STILL})
+        self.assertIn("look", self.expect("lookSaved")["error"])
+
+    def test_save_look_writes_the_live_file(self):
+        self.start()
+        basic = {"background": "surface_container", "alpha": 0.8, "motion": False, "flare": False, "glass": False,
+                 "softPills": False}
+        self.send({"type": "saveLook", "look": basic})
+        self.assertEqual(self.expect("lookSaved")["look"], basic)
+        with open(self.look_file) as f:
+            self.assertEqual(json.load(f), basic)
+
+    def test_a_bad_look_is_refused_and_the_file_stays(self):
+        self.start()
+        self.send({"type": "saveLook", "look": dict(STILL, alpha=0.2)})
+        self.assertIn("alpha", self.expect("lookSaved")["error"])
+        with open(self.look_file) as f:
+            self.assertEqual(json.load(f), STILL)
 
 
 if __name__ == "__main__":

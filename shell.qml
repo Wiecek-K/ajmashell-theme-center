@@ -15,6 +15,7 @@ ShellRoot {
     id: root
 
     PaletteState { id: palette; ui: center.ui }
+    LookState { id: look; palette: palette }
     SettingsState { id: settings; palette: palette }
 
     QtObject {
@@ -27,6 +28,7 @@ ShellRoot {
         // in bar order; "right" tabs at the end. The window starts on the first one.
         readonly property var tabs: [
             { title: "Palette", source: "PaletteTab.qml", state: palette },
+            { title: "Look", source: "LookTab.qml", state: look },
             { title: "Settings", source: "SettingsTab.qml", state: settings, right: true }
         ]
         property int current: 0

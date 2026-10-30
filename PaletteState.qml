@@ -4,7 +4,8 @@
 // (real matugen through the Ajmashell palette_recipe.py) and the paths of the helper, which the Settings tab edits (a
 // change restarts the helper, the window stays). Not visible; PaletteTab.qml is the view.
 // For the frame and the other tabs (read only): edited, busy, save(), saving, saveError, effect, saveFirst, and the colours
-// of both recipes for the selected wallpaper (currentColors, trialColors, wallpaperName).
+// of both recipes for the selected wallpaper (currentColors, trialColors, wallpaperName). The Look tab (LookState) talks to the
+// same helper: send() and the signal message (every message of the helper).
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -13,6 +14,7 @@ Scope {
     id: app
 
     property var ui                     // colours of the window, from the frame
+    signal message(var m)               // every message of the helper, after this state took it (LookState)
 
     property var items: []          // [{fileName, path, thumb}] in carousel index order
     property string current: ""     // fileName of the system's current wallpaper
@@ -189,7 +191,16 @@ Scope {
         request();
     }
 
+    function send(m) {
+        helper.write(JSON.stringify(m) + "\n");
+    }
+
     function onMessage(m) {
+        handle(m);
+        message(m);
+    }
+
+    function handle(m) {
         if (m.type === "ready") {
             // also after a settings change: everything computed so far belonged to the old paths, and the
             // trial starts again from the (maybe other) recipe file; the selected wallpaper stays if it is there
