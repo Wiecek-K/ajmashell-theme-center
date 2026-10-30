@@ -62,7 +62,7 @@ panel names it and what it stops; open the Settings tab (see below).
 | Term | Meaning |
 |---|---|
 | palette recipe | the settings that turn a wallpaper into a palette: how the seed is chosen and the matugen palette flags |
-| current recipe | the system palette recipe file, as Ajmashell uses it now |
+| current recipe | the recipe Ajmashell uses now: its live palette recipe file, or its default recipe without that file |
 | trial recipe | a copy of the current recipe that the controls change; nothing in the system changes until you save it |
 | candidate | one of the colours matugen finds in the wallpaper's thumbnail, most dominant first |
 | seed | the candidate the recipe picks; matugen builds the whole palette from it |
@@ -82,7 +82,7 @@ drops unsaved trial settings without asking.
   Their lists and ranges come from `palette_recipe.options()`; the dark lightness has no lower limit in matugen (−∞),
   so its slider starts at −1. A request goes to the helper after 300 ms without changes (debounce). The trial is
   computed for the selected wallpaper only (and for each one you select later); "compute all wallpapers" computes the
-  rest of the folder. "restore current" goes back to the system palette recipe file. Strip: "seed" / "palette" = what
+  rest of the folder. "restore current" goes back to the current recipe. Strip: "seed" / "palette" = what
   the trial changes on that wallpaper; the second dot is the trial seed.
 - For each recipe the middle shows a desktop mock-up (Bar and control centre) and a kitty mock-up, side by side, and
   the table of all palette tokens.
@@ -107,15 +107,16 @@ Each tab with trial settings has two buttons: its own save ("Save palette") and 
 Esc or a click beside the box cancels. It saves the palette first, then the other tabs in the order of the bar, and
 stops at the first error; the line under the button says what was saved and what not.
 
-"Save palette" writes the trial recipe into the palette recipe file of Ajmashell,
-`~/.config/matugen/palette-recipe.json` (through `palette_recipe.save()`: validated, atomic). Then, in the background,
+"Save palette" writes the trial recipe into Ajmashell's live palette recipe file,
+`~/.local/state/ajmashell/palette-recipe.json` (through `palette_recipe.save()`: validated, atomic). Then, in the background,
 it runs the carousel indexer (new seeds and colour categories, the thumbnails stay) and `wpapply.sh` on the wallpaper
 on your desktop, so the desktop takes the new colours at once. The steps show under the button. The saved recipe
 becomes the current one; every later wallpaper change uses it too.
 
-Nothing is committed. If your Ajmashell lives in a dotfiles git repository, `palette-recipe.json` shows there as a
-changed file: commit it yourself when you like the result, or `git checkout` it (then apply a wallpaper again) to go
-back.
+The file is outside git, so trying a recipe leaves no trace in the dotfiles. Without it Ajmashell uses its default
+recipe (`wallpaper/palette-recipe-default.json`); delete the file and apply a wallpaper again to go back to it. The tool
+watches the file: a change made outside it (by hand, a delete) becomes the current recipe in the window. The tool
+never writes into the Ajmashell directory.
 
 "Save look" writes the trial look into Ajmashell's live look file, `~/.local/state/ajmashell/look.json` (through
 `look_settings.save()`: validated, atomic). Ajmashell watches the file and changes its popups at once; the file is
@@ -146,8 +147,8 @@ the mock-ups. The Ajmashell roles (Bar islands, control centre) are copied by ha
 of `Theme.qml`, fix them there.
 
 The palette recipe file is no setting: the tool reads and saves the file the recipe module names
-(`DEFAULT_PATH` in `palette_recipe.py`, today `~/.config/matugen/palette-recipe.json`), the same file `indexer.py` and
-`wpapply.sh` read. Without it the window says so and shows the recipe's starting values; a save creates it.
+(`DEFAULT_PATH` in `palette_recipe.py`, today `~/.local/state/ajmashell/palette-recipe.json`), the same file `indexer.py`
+and `wpapply.sh` read. Without it the window shows Ajmashell's default recipe; a save creates it.
 
 `install.sh` reads the Ajmashell directory from the same settings file, so with Ajmashell elsewhere, write it there
 first: `{"ajmashellDir": "/path/to/ajmashell"}` in `~/.config/ajmashell-theme-center/settings.json`.
@@ -193,7 +194,7 @@ they stay Polish. Everything else in the window is English.
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
 - `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
   recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the
-  helper restarts in the same process), missing paths as messages, a save with its steps, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`.
+  helper restarts in the same process), missing paths as messages, a save with its steps, the default recipe without the live file and `readRecipe`, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`.
   Everything runs in a temporary directory with copies of the real `palette_recipe.py` and `look_settings.py` (from `$AJMASHELL_DIR` or
   `~/.config/quickshell/ajmashell`; the tests skip without it), stand-ins for `indexer.py` and `wpapply.sh`, and a
   stand-in `matugen` that only answers `--version`; no palette is computed. A helper that does not report its

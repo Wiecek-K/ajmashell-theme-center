@@ -2,7 +2,8 @@
 # Tests of the helper's protocol (helper/tuner.py, JSON lines on stdin/stdout), run as the window runs it.
 # Everything lives in a temporary directory: settings, cache, palette recipe file, wallpaper index and stand-in
 # Ajmashell directories, each with a copy of the real palette_recipe.py (the recipe logic is Ajmashell's, never copied
-# into this repo) whose DEFAULT_PATH points to a file in the temporary directory, and a stub indexer.py. Nothing here
+# into this repo) whose DEFAULT_PATH (the live file) points to a file in the temporary directory, next to it a default
+# recipe (NEUTRAL, so a test sees which file was read; Ajmashell ticket E15), and a stub indexer.py. Nothing here
 # calls matugen: the index is empty, so no palette is computed.
 # The same for the look (ticket 13): a copy of the real look_settings.py and look-options.json, its DEFAULT_PATH (the
 # live file) in the temporary directory.
@@ -33,6 +34,9 @@ if __name__ == "__main__":
 
 VIBRANT = {"seed": {"rule": "darkness"},
            "palette": {"scheme": "scheme-vibrant", "contrast": 0.5, "lightnessDark": 0.0}}
+# the default recipe of the stand-in Ajmashell directories (palette-recipe-default.json)
+NEUTRAL = {"seed": {"rule": "value"},
+           "palette": {"scheme": "scheme-neutral", "contrast": 0.0, "lightnessDark": 0.0}}
 
 
 # a look other than the defaults (fancy2), so a test sees the file was read
@@ -82,6 +86,7 @@ class Helper(unittest.TestCase):
             self.fail(f"{RECIPE_MODULE}: no single DEFAULT_PATH line to point at the temporary directory")
         with open(os.path.join(folder, "wallpaper", "palette_recipe.py"), "w") as f:
             f.write(code)
+        self.write(os.path.join(folder, "wallpaper", "palette-recipe-default.json"), NEUTRAL)
         with open(os.path.join(folder, "wallpaper", "indexer.py"), "w") as f:
             f.write(STUB_INDEXER)
         look_dir = os.path.join(folder, "singletons", "look")
@@ -172,11 +177,20 @@ class Helper(unittest.TestCase):
         self.assertTrue(any("Super + W" in p for p in ready["problems"]))
         self.assertTrue(any("kitty mock-up is off" in p for p in ready["problems"]))
 
-    def test_missing_recipe_file_is_a_message_and_starting_values(self):
+    def test_missing_live_recipe_file_gives_the_default_recipe_without_a_message(self):
+        # no live file is normal: Ajmashell uses its default recipe (ticket E15)
         os.remove(self.recipe_file)
         ready = self.start()
-        self.assertEqual(ready["recipe"]["palette"]["scheme"], "scheme-tonal-spot")
-        self.assertTrue(any(self.recipe_file in p and "starting values" in p for p in ready["problems"]))
+        self.assertEqual(ready["recipe"], NEUTRAL)
+        self.assertFalse(any(self.recipe_file in p for p in ready["problems"]), ready["problems"])
+
+    def test_read_recipe_follows_a_change_made_outside_the_tool(self):
+        self.assertEqual(self.start()["recipe"], VIBRANT)
+        os.remove(self.recipe_file)  # deleted by hand: the system is on the default recipe now
+        self.send({"type": "readRecipe"})
+        read = self.expect("recipeRead")
+        self.assertEqual(read["recipe"], NEUTRAL)
+        self.assertEqual(len(read["fingerprint"]), 16)
 
     def test_missing_ajmashell_directory_is_a_message_not_a_crash(self):
         self.settings["ajmashellDir"] = self.path("nowhere")

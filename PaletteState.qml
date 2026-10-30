@@ -20,7 +20,7 @@ Scope {
     property string current: ""     // fileName of the system's current wallpaper
     property int sel: 0
     readonly property var it: items.length ? items[sel] : null
-    property var recipe: null       // current recipe (the system file, validated by the helper)
+    property var recipe: null       // current recipe (the live file over Ajmashell's default recipe, validated by the helper)
     property string fingerprint: ""
     property var trial: null        // trial recipe: starts as a copy of the current one, changed by the controls
     property string trialFingerprint: ""
@@ -234,6 +234,16 @@ Scope {
             const kept = items.findIndex(x => x.fileName === before);
             sel = kept >= 0 ? kept : Math.max(0, items.findIndex(x => x.fileName === current));
             request();
+        } else if (m.type === "recipeRead") {
+            // the live file changed outside the tool (a hand edit, a delete): the trial follows unless it was edited
+            const follow = !trialEdited;
+            recipe = m.recipe;
+            fingerprint = m.fingerprint;
+            if (follow) {
+                trial = JSON.parse(JSON.stringify(m.recipe));
+                trialFingerprint = m.fingerprint;
+            }
+            request();
         } else if (m.type === "accepted") {
             fingerprint = m.fingerprints[0];
             trialFingerprint = m.fingerprints[1];
@@ -321,6 +331,15 @@ Scope {
         id: checkDebounce
         interval: 300
         onTriggered: app.checkDraft()
+    }
+
+    FileView {
+        // the live palette recipe file (ticket E15, as the Look tab): the helper reads it (palette_recipe.load, the
+        // same rules as Ajmashell); here only the change is seen. A delete = Ajmashell's default recipe.
+        path: app.recipeFile
+        watchChanges: !!app.recipeFile
+        printErrors: false
+        onFileChanged: app.send({ type: "readRecipe" })
     }
 
     Process {

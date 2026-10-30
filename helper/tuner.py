@@ -24,6 +24,7 @@
 #       write the look as Ajmashell's live look file (look_settings.save: strict validation, atomic); Ajmashell watches
 #       the file and changes at once (ticket 13).
 #   {"type": "readLook"}   the live look file again: the window saw it change (a hand edit, a delete)
+#   {"type": "readRecipe"}   the palette recipe again: the window saw its live file change (a hand edit, a delete)
 #   {"type": "check", "paths": {key: text}}   status of paths typed in the Settings panel, nothing saved
 #   {"type": "settings", "paths": {key: text}}
 #       save the settings (settings.save: atomic, an empty path = the default), then the helper restarts itself in the
@@ -54,6 +55,8 @@
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #   {"type": "lookSaved", "look": {...}} | {"type": "lookSaved", "error": text}   (live look file written or not)
 #   {"type": "lookRead", "current": {...}}   (look_settings.load() after "readLook"; nothing without the module)
+#   {"type": "recipeRead", "recipe": {...}, "fingerprint"}   (palette_recipe.load() after "readRecipe"; nothing
+#       without the module)
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in $XDG_CACHE_HOME/ajmashell-theme-center
 # (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this
@@ -424,9 +427,6 @@ def main():
     items = load_items()
     current = current_wallpaper()
     recipe = palette_recipe.load() if palette_recipe else None
-    if palette_recipe and not os.path.isfile(palette_recipe.DEFAULT_PATH):
-        problems.append(f"{palette_recipe.DEFAULT_PATH} not found: the palette recipe shows its starting values; "
-                        "a save creates the file")
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
@@ -452,6 +452,9 @@ def main():
             queue.request([validated(r) for r in recipes], [*orders, *[[]] * (len(recipes) - len(orders))])
         elif msg.get("type") == "save":
             saver.submit(save, msg.get("recipe"))
+        elif msg.get("type") == "readRecipe" and palette_recipe:
+            recipe = palette_recipe.load()
+            send({"type": "recipeRead", "recipe": recipe, "fingerprint": palette_recipe.fingerprint(recipe)})
         elif msg.get("type") == "readLook" and look_settings:
             send({"type": "lookRead", "current": look_settings.load()})
         elif msg.get("type") == "saveLook":
