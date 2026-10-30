@@ -306,6 +306,12 @@ class Helper(unittest.TestCase):
         with open(self.look_file) as f:
             self.assertEqual(json.load(f), STILL)
 
+    def test_read_look_follows_a_change_made_outside_the_tool(self):
+        defaults = self.start()["lookSettings"]["options"]["defaults"]
+        os.remove(self.look_file)  # deleted by hand: Ajmashell is on its defaults now
+        self.send({"type": "readLook"})
+        self.assertEqual(self.expect("lookRead")["current"], defaults)
+
 
 if __name__ == "__main__":
     unittest.main()

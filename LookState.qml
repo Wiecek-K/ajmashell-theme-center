@@ -4,10 +4,13 @@
 // soft pills). Current = the live file Ajmashell watches (~/.local/state/ajmashell/look.json, or the defaults without
 // it); trial = what the builder shows. Roles, ranges, presets and defaults come from Ajmashell's look-options.json
 // through the helper (look_settings.options()), never copied here. Saving writes only the live file; Ajmashell changes
-// at once. Talks to the helper of PaletteState (send(), message). Not visible; LookTab.qml is the view.
+// at once. The live file is watched: a change made outside the tool (by hand, a delete) becomes the current look, and
+// the trial follows while it was not edited. Talks to the helper of PaletteState (send(), message). Not visible;
+// LookTab.qml is the view.
 // Tab interface of the frame: edited, busy, save(), saving, saveError, effect.
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 Scope {
     id: app
@@ -78,6 +81,14 @@ Scope {
     readonly property bool busy: saving || palette.restarting
     readonly property string effect: "writes Ajmashell's live look file; its popups change at once"
 
+    FileView {
+        // the helper reads it (look_settings.load, the same rules as Ajmashell); here only the change is seen
+        path: app.file
+        watchChanges: !!app.file
+        printErrors: false
+        onFileChanged: app.palette.send({ type: "readLook" })
+    }
+
     Connections {
         target: app.palette
 
@@ -91,6 +102,10 @@ Scope {
                 app.saving = false;
                 app.saveError = "";
                 app.saved = false;
+            } else if (m.type === "lookRead") {
+                const follow = !app.edited;
+                app.current = m.current;
+                if (follow) app.trial = app.copy(app.current);
             } else if (m.type === "lookSaved") {
                 if (m.error) {
                     app.saveError = m.error;

@@ -23,6 +23,7 @@
 #   {"type": "saveLook", "look": {...}}
 #       write the look as Ajmashell's live look file (look_settings.save: strict validation, atomic); Ajmashell watches
 #       the file and changes at once (ticket 13).
+#   {"type": "readLook"}   the live look file again: the window saw it change (a hand edit, a delete)
 #   {"type": "check", "paths": {key: text}}   status of paths typed in the Settings panel, nothing saved
 #   {"type": "settings", "paths": {key: text}}
 #       save the settings (settings.save: atomic, an empty path = the default), then the helper restarts itself in the
@@ -51,6 +52,7 @@
 #   {"type": "saved", "recipe": {...}, "fingerprint"} | {"type": "saved", "error": text}   (file written or not)
 #   {"type": "apply", "stage": "indexer" | "wallpaper" | "done"} | {"type": "apply", "stage": "error", "message"}
 #   {"type": "lookSaved", "look": {...}} | {"type": "lookSaved", "error": text}   (live look file written or not)
+#   {"type": "lookRead", "current": {...}}   (look_settings.load() after "readLook"; nothing without the module)
 #
 # Results are cached per (wallpaper path, mtime, size, recipe fingerprint) in $XDG_CACHE_HOME/ajmashell-theme-center
 # (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this
@@ -446,6 +448,8 @@ def main():
             queue.request([validated(r) for r in recipes], [*orders, *[[]] * (len(recipes) - len(orders))])
         elif msg.get("type") == "save":
             saver.submit(save, msg.get("recipe"))
+        elif msg.get("type") == "readLook" and look_settings:
+            send({"type": "lookRead", "current": look_settings.load()})
         elif msg.get("type") == "saveLook":
             save_look(msg.get("look"))  # one small file: at once, not behind a palette save
         elif msg.get("type") == "check":
