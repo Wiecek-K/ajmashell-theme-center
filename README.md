@@ -94,6 +94,11 @@ drops unsaved trial settings without asking.
   above the other, for the wallpaper selected in Palette: the current look on the current palette recipe and the trial look on
   the trial palette recipe, each with the Orbita and the control centre on a blurred piece of the wallpaper (a still
   frame: "motion" in the caption when the look moves).
+- Under the builder, the **gradient** of the popups' background (one for every look: a preset keeps it): style (none,
+  linear, corner glow, bands, two-colour), colours A and B (each a select of the same roles), strength, angle and the
+  reaches A and B (what they mean depends on the style; a new style sets them to its defaults, a reach the style does
+  not use is greyed out). The styles and ranges come from `look-options.json` too. The previews draw the gradient
+  with Ajmashell's own `look/GradientFill.qml`, loaded from the Ajmashell directory, so they match the popups.
 
 ## Saving: what changes in your system
 
@@ -127,7 +132,7 @@ field. While you type, each field shows "found" or "missing".
 
 | Setting | Default | Without it |
 |---|---|---|
-| Ajmashell directory | `~/.config/quickshell/ajmashell` | needs `wallpaper/palette_recipe.py` (`load`, `save`, `seed_flags`, `palette_flags`, `fingerprint`, `options`) and `wallpaper/indexer.py` (`color_bucket`, the colour category; run after a save). Without them nothing is computed or saved. The Look tab needs `singletons/look/look_settings.py` (`load`, `save`, `options`, `DEFAULT_PATH`) and its `look-options.json`; without them only that tab is off |
+| Ajmashell directory | `~/.config/quickshell/ajmashell` | needs `wallpaper/palette_recipe.py` (`load`, `save`, `seed_flags`, `palette_flags`, `fingerprint`, `options`) and `wallpaper/indexer.py` (`color_bucket`, the colour category; run after a save). Without them nothing is computed or saved. The Look tab needs `singletons/look/look_settings.py` (`load`, `save`, `options`, `DEFAULT_PATH`) and its `look-options.json`; without them only that tab is off. Without `look/GradientFill.qml` the previews draw no gradient |
 | Carousel wallpaper index | `~/.cache/ajmashell/wallpapers/index.json` | no wallpapers: open the wallpaper carousel (Super + W) once to build it |
 | Current wallpaper link | `~/.config/hypr/current_wallpaper` | no wallpaper marked "on desktop"; a save cannot apply the palette |
 | kitty colour template | `~/.config/matugen/templates/kitty-colors.conf` | the kitty mock-up is off (lines `key {{ colors.TOKEN.default.hex }}`) |
@@ -162,7 +167,7 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
 | `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
 | `LookState.qml` | state of the Look tab: the current and the trial look, presets, "Save look" (through the helper of `PaletteState`) |
-| `LookTab.qml`, `LookPresets.qml`, `LookMock.qml` | the Look tab: previews of both looks, the presets and the builder, the Orbita and control centre mock-up |
+| `LookTab.qml`, `LookPresets.qml`, `GradientSection.qml`, `LookMock.qml` | the Look tab: previews of both looks, the presets and the builder, the gradient section, the Orbita and control centre mock-up (gradient drawn by Ajmashell's `look/GradientFill.qml`) |
 | `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml`; the look's background from the look; kitty and the border from the system's files) |
 | `SettingsTab.qml`, `SettingsState.qml` | the Settings tab: a field per path, its default, "found" / "missing" |
 | `helper/tuner.py` | the helper: real matugen, the recipe module, the look module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
@@ -188,7 +193,7 @@ they stay Polish. Everything else in the window is English.
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
 - `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
   recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the
-  helper restarts in the same process), missing paths as messages, a save with its steps, the matugen version warning, the look in `ready` and `saveLook`.
+  helper restarts in the same process), missing paths as messages, a save with its steps, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`.
   Everything runs in a temporary directory with copies of the real `palette_recipe.py` and `look_settings.py` (from `$AJMASHELL_DIR` or
   `~/.config/quickshell/ajmashell`; the tests skip without it), stand-ins for `indexer.py` and `wpapply.sh`, and a
   stand-in `matugen` that only answers `--version`; no palette is computed. A helper that does not report its

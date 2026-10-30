@@ -6,6 +6,8 @@
 // motion is drawn (CPU), the caption says "motion". Colours: Mockups.look(); sizes scaled from Theme.orbit (900×660,
 // core 260, nodes 220×48). Own drawing after Ajmashell's orbit/Orbit.qml, orbit/OrbitBackdrop.qml and
 // control/ControlCenter.qml, copied here like the roles in Mockups.js. The texts copy the real (Polish) shell.
+// The gradient of the background (ticket 14) is not copied: Ajmashell's own look/GradientFill.qml, loaded from its
+// directory (`fill`), draws it in both boxes; without that file the boxes keep the plain background.
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
@@ -15,8 +17,10 @@ import "Mockups.js" as Mockups
 Item {
     id: m
     property var c: ({})         // palette {token: hex}
-    property var look: null      // {background, alpha, motion, flare, glass, softPills}
+    property var look: null      // {background, alpha, motion, flare, glass, softPills, gradient}
     property string thumb
+    property string fill         // Ajmashell's look/GradientFill.qml, "" without it
+    readonly property bool gradientOn: m.fill !== "" && !!m.look && !!m.look.gradient && m.look.gradient.style !== "off"
     readonly property var d: Mockups.look(m.c, m.look)
     readonly property bool soft: !!m.look && m.look.softPills
     clip: true
@@ -44,6 +48,21 @@ Item {
     readonly property real h: height - 2 * pad
     // the Orbita 900×660, the Centrum about 2:5 beside it
     readonly property real k: Math.min(h / 660, (width - 3 * pad) / (900 + 0.5 * 660))
+
+    // the look's gradient over the box's background (Ajmashell's GradientFill.qml); the box itself is then transparent
+    component GradientLayer: Loader {
+        id: gl
+        property real radius
+        anchors.fill: parent
+        active: m.gradientOn
+        source: active ? "file://" + m.fill : ""
+        // GradientFill's properties (a file loaded at run time: no type for qmllint, so by name)
+        Binding { target: gl.item; property: "settings"; value: m.look ? m.look.gradient : null; when: gl.item !== null }
+        Binding { target: gl.item; property: "colorA"; value: m.look ? m.c[m.look.gradient.a] || "transparent" : "transparent"; when: gl.item !== null }
+        Binding { target: gl.item; property: "colorB"; value: m.look ? m.c[m.look.gradient.b] || "transparent" : "transparent"; when: gl.item !== null }
+        Binding { target: gl.item; property: "base"; value: m.d.background; when: gl.item !== null }
+        Binding { target: gl.item; property: "radius"; value: gl.radius; when: gl.item !== null }
+    }
 
     // pill of a look with or without softPills (Pill.qml)
     component MockPill: Rectangle {
@@ -127,10 +146,11 @@ Item {
             id: orbit
             width: Math.round(900 * m.k); height: Math.round(660 * m.k)
             radius: 16 * m.k
-            color: m.d.background
+            color: m.gradientOn ? "transparent" : m.d.background
             readonly property real cx: width / 2
             readonly property real cy: (height - 34 * m.k) / 2 // the field above the tab row
 
+            GradientLayer { radius: orbit.radius }
             Flare { anchors.fill: parent; visible: !!m.look && m.look.flare; d: m.d; k: m.k; radius: orbit.radius }
 
             // glass: a fade under the core (orbit.fadeStops over 1.7 × core)
@@ -197,8 +217,9 @@ Item {
             id: control
             width: Math.round(0.5 * 660 * m.k); height: orbit.height
             radius: 16 * m.k
-            color: m.d.background
+            color: m.gradientOn ? "transparent" : m.d.background
 
+            GradientLayer { radius: control.radius }
             Flare { anchors.fill: parent; visible: !!m.look && m.look.flare; d: m.d; k: m.k; radius: control.radius }
 
             Column {

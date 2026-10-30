@@ -36,8 +36,11 @@ VIBRANT = {"seed": {"rule": "darkness"},
 
 
 # a look other than the defaults (fancy2), so a test sees the file was read
+# (and a gradient other than the defaults, ticket 14)
+GRADIENT = {"style": "linear", "a": "primary", "b": "tertiary_container", "strength": 0.4, "angle": 90, "reachA": 0.6,
+            "reachB": 0.5}
 STILL = {"background": "on_primary_fixed", "alpha": 0.9, "motion": False, "flare": True, "glass": True,
-         "softPills": True}
+         "softPills": True, "gradient": GRADIENT}
 
 
 @unittest.skipUnless(os.path.isfile(RECIPE_MODULE) and os.path.isfile(LOOK_MODULE), f"no {RECIPE_MODULE} or {LOOK_MODULE}")
@@ -281,6 +284,15 @@ class Helper(unittest.TestCase):
         look = self.start()["lookSettings"]
         self.assertEqual(look["current"], look["options"]["defaults"])
 
+    def test_ready_names_the_gradient_drawing_of_ajmashell(self):
+        fill = os.path.join(self.shell, "look", "GradientFill.qml")
+        os.makedirs(os.path.dirname(fill))
+        open(fill, "w").close()
+        self.assertEqual(self.start()["lookSettings"]["gradientFill"], fill)
+
+    def test_an_ajmashell_from_before_ticket_14_has_no_gradient_drawing(self):
+        self.assertIsNone(self.start()["lookSettings"]["gradientFill"])
+
     def test_ajmashell_without_the_look_module_is_a_message_not_a_crash(self):
         os.remove(os.path.join(self.shell, "singletons", "look", "look_settings.py"))
         ready = self.start()
@@ -293,7 +305,7 @@ class Helper(unittest.TestCase):
     def test_save_look_writes_the_live_file(self):
         self.start()
         basic = {"background": "surface_container", "alpha": 0.8, "motion": False, "flare": False, "glass": False,
-                 "softPills": False}
+                 "softPills": False, "gradient": dict(GRADIENT, style="corner", reachB=0.25)}
         self.send({"type": "saveLook", "look": basic})
         self.assertEqual(self.expect("lookSaved")["look"], basic)
         with open(self.look_file) as f:

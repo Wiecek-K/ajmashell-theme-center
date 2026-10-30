@@ -3,7 +3,7 @@
 // field makes it "custom". Builder: background role, alpha, motion, lens flare, glass core, soft pills. Lists and the
 // alpha range come from Ajmashell's look-options.json through the helper; nothing is saved under a name here (a new
 // preset or other defaults are a manual change in Ajmashell, docs/wyglady-ajmashella.md of the project). A blue frame
-// marks the current value. The gradient section (ticket 14) goes under it in LookTab.qml.
+// marks the current value. A preset has no gradient (one for every look): GradientSection.qml under it in LookTab.qml.
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls

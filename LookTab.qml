@@ -3,7 +3,8 @@
 // every control is in the panel on the right, so the previews take the rest; user, 2026-10-30)
 // for the wallpaper selected in the Palette tab: current = the live look on the current palette recipe, trial = the
 // builder's look on the trial palette recipe (colours from PaletteState), each in LookMock.qml. Panel on the right:
-// presets and builder (LookPresets.qml; the gradient section of ticket 14 goes under it), "Save look", "Save all".
+// presets and builder (LookPresets.qml), the gradient of the background under it (GradientSection.qml, ticket 14),
+// "Save look", "Save all".
 // Only the view: the state is LookState.qml in the frame.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -74,6 +75,22 @@ Item {
                     visible: !!tab.app.options
                     width: col.width
                     app: tab.app
+                }
+
+                Rectangle { visible: !!tab.app.options; width: parent.width; height: 1; color: tab.app.ui.line }
+
+                GradientSection {
+                    visible: !!tab.app.options
+                    width: col.width
+                    app: tab.app
+                }
+                Text {
+                    visible: !!tab.app.options && !tab.app.gradientFill
+                    width: col.width
+                    wrapMode: Text.Wrap
+                    text: "The previews draw no gradient: the Ajmashell directory has no look/GradientFill.qml (see Settings)."
+                    color: tab.app.ui.error
+                    font { family: tab.app.ui.font; pixelSize: 11 }
                 }
 
                 Rectangle { width: parent.width; height: 1; color: tab.app.ui.line }
@@ -147,6 +164,7 @@ Item {
                         c: pv.shown
                         look: pv.look
                         thumb: tab.pal.it ? tab.pal.it.thumb : ""
+                        fill: tab.app.gradientFill
                     }
                 }
             }

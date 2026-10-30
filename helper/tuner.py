@@ -40,9 +40,10 @@
 #    "settingsFile": path, "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
 #    "problems": [text],   (each missing path with what it stops; shown in the window)
 #    "matugenWarning": text | null,   (matugen missing or not 4.2.x: shown in the window, nothing blocked)
-#    "lookSettings": {"options": {...}, "current": {...}, "file": path} | null}
+#    "lookSettings": {"options": {...}, "current": {...}, "file": path, "gradientFill": path | null} | null}
 #       (the Look tab, ticket 13: look_settings.options() and load() of <ajmashellDir>/singletons/look; null without
-#       the module, see "problems")
+#       the module, see "problems"; ticket 14: <ajmashellDir>/look/GradientFill.qml, which the previews load to draw
+#       the gradient, null without it)
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
 #   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
@@ -340,8 +341,11 @@ def save_look(look):
 
 
 def look_state():
-    """The Look tab's part of "ready": options, the look in the live file (defaults without it) and the file."""
-    return {"options": look_settings.options(), "current": look_settings.load(), "file": look_settings.DEFAULT_PATH}
+    """The Look tab's part of "ready": options, the look in the live file (defaults without it), the file, and
+    Ajmashell's gradient drawing that the previews load (ticket 14; None for an Ajmashell without it)."""
+    fill = os.path.join(PATHS["ajmashellDir"], "look", "GradientFill.qml")
+    return {"options": look_settings.options(), "current": look_settings.load(), "file": look_settings.DEFAULT_PATH,
+            "gradientFill": fill if os.path.isfile(fill) else None}
 
 
 def matugen_warning():
