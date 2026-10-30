@@ -2,7 +2,7 @@
 // Gradient section of the Look tab's builder (faza E ticket 14, ADR 0021): the gradient of the big popups' background,
 // one for every look (a preset keeps it). Style, colours A and B (roles of look-options.json, each a select that opens
 // its list), strength, angle and the reaches A and B. A new style sets the reaches to its defaults; a reach the style
-// does not use is greyed out. Styles, ranges and the roles come from Ajmashell's look-options.json through the helper;
+// does not use is greyed out, the select of colour B is hidden in a style without B (`uses` in look-options.json). Styles, ranges and the roles come from Ajmashell's look-options.json through the helper;
 // the drawing is Ajmashell's look/GradientFill.qml (LookMock.qml). A blue frame or mark = the current value.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -17,7 +17,9 @@ Column {
     readonly property var t: app.trial ? app.trial.gradient : null
     readonly property var cur: app.current ? app.current.gradient : null
     readonly property bool on: !!t && t.style !== "off"
-    readonly property var reaches: o && t ? (o.styles.find(st => st.name === t.style) || { reaches: {} }).reaches : {}
+    readonly property var style: o && t ? o.styles.find(st => st.name === t.style) || null : null // its uses and reaches
+    readonly property var reaches: style ? style.reaches : ({})
+    readonly property var uses: style ? style.uses : []
     readonly property var colours: app.palette.trialColors || app.palette.currentColors
     readonly property var styleNames: ({ off: "none", linear: "linear", corner: "corner glow", bands: "bands", duo: "two-colour" })
     // what the reaches mean in each style
@@ -165,7 +167,7 @@ Column {
     }
 
     RoleSelect { label: "Colour A"; part: "a" }
-    RoleSelect { label: "Colour B"; part: "b"; enabled: s.on && s.t.style !== "linear" } // linear: A only
+    RoleSelect { label: "Colour B"; part: "b"; visible: s.uses.includes("b") } // only where the style draws B (user, 2026-10-30)
 
     PartSlider { label: "Strength"; part: "strength"; range: s.o ? s.o.strength : null; enabled: s.on }
     PartSlider { label: "Angle"; part: "angle"; range: s.o ? s.o.angle : null; percent: false; enabled: s.on }

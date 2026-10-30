@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Presets and builder of the Look tab (ticket 13, ADR 0021): a click on a preset fills the builder; any change of a
-// field makes it "custom". Builder: background role, alpha, motion, lens flare, glass core, soft pills. Lists and the
+// field makes it "custom". Builder: effects (motion, lens flare, glass core, soft pills; right under the presets,
+// user 2026-10-30), background role, alpha. Lists and the
 // alpha range come from Ajmashell's look-options.json through the helper; nothing is saved under a name here (a new
 // preset or other defaults are a manual change in Ajmashell, docs/wyglady-ajmashella.md of the project). A blue frame
 // marks the current value. A preset has no gradient (one for every look): GradientSection.qml under it in LookTab.qml.
@@ -43,6 +44,28 @@ Column {
         text: "Trial: " + p.app.presetOf(p.t) + "   ·   current: " + p.app.presetOf(p.cur)
         color: p.app.edited ? p.app.ui.trial : p.app.ui.dim
         font { family: p.app.ui.font; pixelSize: 12 }
+    }
+
+    Column {
+        width: parent.width
+        spacing: 6
+        Text { text: "Effects (click to switch)"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
+        Flow {
+            width: parent.width
+            spacing: 6
+            Repeater {
+                model: p.o ? p.o.flags : []
+                Chip {
+                    id: fc
+                    required property string modelData
+                    app: p.app
+                    label: (p.flagNames[fc.modelData] || fc.modelData) + (p.t && p.t[fc.modelData] ? " on" : " off")
+                    selected: !!p.t && p.t[fc.modelData]
+                    border.color: fc.selected ? fc.tone : p.cur && p.cur[fc.modelData] ? p.app.ui.accent : p.app.ui.line
+                    onClicked: p.app.set(fc.modelData, !p.t[fc.modelData])
+                }
+            }
+        }
     }
 
     Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
@@ -117,28 +140,6 @@ Column {
                 y: sl.topPadding + sl.availableHeight / 2 - height / 2
                 width: 14; height: 14; radius: 7
                 color: sl.pressed ? p.app.ui.text : p.app.ui.trial
-            }
-        }
-    }
-
-    Column {
-        width: parent.width
-        spacing: 6
-        Text { text: "Effects (click to switch)"; color: p.app.ui.dim; font { family: p.app.ui.font; pixelSize: 11 } }
-        Flow {
-            width: parent.width
-            spacing: 6
-            Repeater {
-                model: p.o ? p.o.flags : []
-                Chip {
-                    id: fc
-                    required property string modelData
-                    app: p.app
-                    label: (p.flagNames[fc.modelData] || fc.modelData) + (p.t && p.t[fc.modelData] ? " on" : " off")
-                    selected: !!p.t && p.t[fc.modelData]
-                    border.color: fc.selected ? fc.tone : p.cur && p.cur[fc.modelData] ? p.app.ui.accent : p.app.ui.line
-                    onClicked: p.app.set(fc.modelData, !p.t[fc.modelData])
-                }
             }
         }
     }
