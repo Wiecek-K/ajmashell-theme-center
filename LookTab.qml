@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The Look tab (ticket 13, ADR 0021): the look of Ajmashell's big popups. Previews "current" and "trial" side by side
+// The Look tab (ticket 13, ADR 0021): the look of Ajmashell's big popups. Previews "current" above "trial" (a column:
+// every control is in the panel on the right, so the previews take the rest; user, 2026-10-30)
 // for the wallpaper selected in the Palette tab: current = the live look on the current palette recipe, trial = the
 // builder's look on the trial palette recipe (colours from PaletteState), each in LookMock.qml. Panel on the right:
 // presets and builder (LookPresets.qml; the gradient section of ticket 14 goes under it), "Save look", "Save all".
@@ -108,7 +109,7 @@ Item {
         contentHeight: previews.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
 
-        Row {
+        Column {
             id: previews
             width: parent.width
             spacing: 16
@@ -125,7 +126,7 @@ Item {
                     property var shown: ({})
                     onColoursChanged: if (colours) shown = colours
                     Component.onCompleted: if (colours) shown = colours
-                    width: (previews.width - previews.spacing) / 2
+                    width: previews.width
                     spacing: 6
 
                     Text {
@@ -141,7 +142,8 @@ Item {
                     }
                     LookMock {
                         width: pv.width
-                        height: Math.round(width * 9 / 16)
+                        // two previews and their captions fill the height; never wider than 16:9
+                        height: Math.min(Math.round(width * 9 / 16), Math.round((tab.height - 2 * 16 - previews.spacing) / 2 - 24))
                         c: pv.shown
                         look: pv.look
                         thumb: tab.pal.it ? tab.pal.it.thumb : ""
