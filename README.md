@@ -87,8 +87,8 @@ drops unsaved trial settings without asking.
 - For each recipe the middle shows a desktop mock-up (Bar and control centre) and a kitty mock-up, side by side, and
   the table of all palette tokens.
 - **Look** sets the look of Ajmashell's seven big popups (Orbita, launcher, control centre, audio, calendar, media,
-  Keybinds; one background for all): presets `basic`, `fancy`, `fancy2`, `still` and a builder (background role, alpha
-  0.5–1, motion, lens flare, glass core, soft pills). A click on a preset fills the builder; any change makes it
+  Keybinds; one background for all): presets `basic`, `fancy`, `fancy2`, `still` and a builder (effects right under the
+  presets: motion, lens flare, glass core, soft pills, blur under the popups; then background role and alpha 0.5–1). A click on a preset fills the builder; any change makes it
   "custom". The roles, the alpha range and the presets come from Ajmashell's `singletons/look/look-options.json`
   (through `look_settings.options()`), never copied here; a blue frame marks the current value. Two previews, one
   above the other, for the wallpaper selected in Palette: the current look on the current palette recipe and the trial look on

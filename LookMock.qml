@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Mock-up of one look for one palette (Look tab, ticket 13): on a blurred piece of the wallpaper (so the look's alpha
-// shows), the two shapes Ajmashell's big popups take: the Orbita (almost square, wider than high: core, nodes on the
+// shows; sharp with blur off), the two shapes Ajmashell's big popups take: the Orbita (almost square, wider than high: core, nodes on the
 // orbit, lens flare at a fixed angle, no lightning; BT nodes in every state: connected, known, unknown, chosen;
 // Wi-Fi / BT tabs as pills) and the Centrum sterowania (upright: sliders, module switches, pills). A still frame: no
 // motion is drawn (CPU), the caption says "motion". Colours: Mockups.look(); sizes scaled from Theme.orbit (900×660,
@@ -25,7 +25,8 @@ Item {
     readonly property bool soft: !!m.look && m.look.softPills
     clip: true
 
-    // a piece of the wallpaper (the middle, twice as large), blurred like Hyprland's blur under a popup
+    // a piece of the wallpaper (the middle, twice as large), blurred like Hyprland's blur under a popup; sharp in a look
+    // with blur off or alpha 1 (Ajmashell's look.mjs blurOff(); at alpha 1 nothing shows through anyway)
     Image {
         id: wall
         anchors.centerIn: parent
@@ -39,7 +40,7 @@ Item {
     MultiEffect {
         anchors.fill: wall
         source: wall
-        blurEnabled: true
+        blurEnabled: !m.look || (m.look.blur && m.look.alpha < 1)
         blur: 1
         blurMax: 32
     }

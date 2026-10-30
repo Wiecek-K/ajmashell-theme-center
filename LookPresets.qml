@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Presets and builder of the Look tab (ticket 13, ADR 0021): a click on a preset fills the builder; any change of a
-// field makes it "custom". Builder: effects (motion, lens flare, glass core, soft pills; right under the presets,
-// user 2026-10-30), background role, alpha. Lists and the
-// alpha range come from Ajmashell's look-options.json through the helper; nothing is saved under a name here (a new
-// preset or other defaults are a manual change in Ajmashell, docs/wyglady-ajmashella.md of the project). A blue frame
-// marks the current value. A preset has no gradient (one for every look): GradientSection.qml under it in LookTab.qml.
+// field makes it "custom". Builder: effects (motion, lens flare, glass core, soft pills, blur under the popups; right
+// under the presets, user 2026-10-30), background role, alpha. Lists and the alpha range come from Ajmashell's
+// look-options.json through the helper; nothing is saved under a name here (a new preset or other defaults are a
+// manual change in Ajmashell, docs/wyglady-ajmashella.md of the project). A blue frame marks the current value.
+// A preset has no gradient (one for every look): GradientSection.qml under it in LookTab.qml.
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -17,7 +17,7 @@ Column {
     readonly property var o: app.options
     readonly property var t: app.trial
     readonly property var cur: app.current
-    readonly property var flagNames: ({ motion: "motion", flare: "lens flare", glass: "glass core", softPills: "soft pills" })
+    readonly property var flagNames: ({ motion: "motion", flare: "lens flare", glass: "glass core", softPills: "soft pills", blur: "blur" })
 
     Text {
         text: "Presets"
