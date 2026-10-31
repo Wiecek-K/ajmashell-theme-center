@@ -3,8 +3,9 @@
 // one for every look (a preset keeps it). Style, colours A and B (roles of look-options.json, each a select that opens
 // its list), strength, angle and the reaches A and B. A new style sets the reaches to its defaults; a reach the style
 // does not use is greyed out, the select of colour B is hidden in a style without B (`uses` in look-options.json), the
-// angle is greyed out in a style without a direction (`angle: false`). Styles conic … aurora: ticket E16 (prototype). Styles, ranges and the roles come from Ajmashell's look-options.json through the helper;
-// the drawing is Ajmashell's look/GradientFill.qml (LookMock.qml). A blue frame or mark = the current value.
+// angle is greyed out in a style without a direction (`angle: false`). Styles, ranges and the roles come from
+// Ajmashell's look-options.json through the helper; the drawing is Ajmashell's look/GradientFill.qml (LookMock.qml).
+// A blue frame or mark = the current value. Styles conic … aurora: ticket E16 (prototype; the user keeps some of them).
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
