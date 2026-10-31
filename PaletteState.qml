@@ -331,12 +331,12 @@ Scope {
     readonly property string effect: "writes the palette recipe file, rebuilds the carousel index and recolours the current wallpaper"
     readonly property string noun: "palette recipe"
     // the save and the steps after it for the toast; null = nothing to say
-    readonly property var status: saving ? { text: "Saving the palette recipe…", level: "busy" }
-                                  : saveError ? { text: "Palette recipe not saved: " + saveError, level: "error" }
-                                  : applyStage === "indexer" ? { text: "Palette recipe saved. Rebuilding the carousel index…", level: "busy" }
+    readonly property var status: saving ? { text: "Setting the palette recipe…", level: "busy" }
+                                  : saveError ? { text: "Palette recipe not set: " + saveError, level: "error" }
+                                  : applyStage === "indexer" ? { text: "Palette recipe set. Rebuilding the carousel index…", level: "busy" }
                                   : applyStage === "wallpaper" ? { text: "Applying the new recipe to the current wallpaper…", level: "busy" }
-                                  : applyStage === "done" ? { text: "Palette recipe saved and applied to the desktop. No commit in the dotfiles.", level: "info" }
-                                  : applyStage === "error" ? { text: "Palette recipe saved, but applying it failed: " + applyError, level: "error" }
+                                  : applyStage === "done" ? { text: "Palette recipe set and applied to the desktop. No commit in the dotfiles.", level: "info" }
+                                  : applyStage === "error" ? { text: "Palette recipe set, but applying it failed: " + applyError, level: "error" }
                                   : null
     readonly property string wallpaperName: it ? it.fileName : ""
     readonly property var currentColors: colorsOf(fingerprint)

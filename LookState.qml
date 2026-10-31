@@ -124,9 +124,9 @@ Scope {
     readonly property string effect: "writes Ajmashell's live look file; its popups change at once"
     readonly property string noun: "look"
     // the result of the last save for the toast; null = nothing to say
-    readonly property var status: saving ? { text: "Saving the look…", level: "busy" }
-                                  : saveError ? { text: "Look not saved: " + saveError, level: "error" }
-                                  : saved ? { text: "Look saved. Ajmashell shows it now. No commit in the dotfiles.", level: "info" }
+    readonly property var status: saving ? { text: "Setting the look…", level: "busy" }
+                                  : saveError ? { text: "Look not set: " + saveError, level: "error" }
+                                  : saved ? { text: "Look set. Ajmashell shows it now. No commit in the dotfiles.", level: "info" }
                                   : null
 
     FileView {

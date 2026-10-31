@@ -59,7 +59,7 @@ Scope {
             store.data = m.data;
             const warnings = m.warnings || [];
             store.status = opened
-                ? { text: "Opened \"" + m.name + "\" into the trial " + store.noun + ". Nothing changes in Ajmashell until you save."
+                ? { text: "Opened \"" + m.name + "\" into the trial " + store.noun + ". Nothing changes in Ajmashell until you set it."
                           + (warnings.length ? " " + warnings.join("; ") : ""),
                     level: warnings.length ? "warn" : "info" }
                 : { text: "Snapshot saved: " + m.file, level: "info" };

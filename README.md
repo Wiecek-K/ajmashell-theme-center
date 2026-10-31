@@ -102,26 +102,27 @@ drops unsaved trial settings without asking.
   they mean depends on the style; a new style sets them to its defaults, a reach the style does not use and the angle
   of a style without a direction are greyed out). The styles and ranges come from `look-options.json` too. The previews draw the gradient
   with Ajmashell's own `look/GradientFill.qml`, loaded from the Ajmashell directory, so they match the popups.
-- **The buttons on the tab bar** (right, before Settings) act on the tab you are in: **Open** (`Ctrl+O`) opens a
-  snapshot into the trial, **Save as** (`Ctrl+Shift+S`) saves the trial as a snapshot, **Save** (`Ctrl+S`) saves the
-  trial into the main (live) file, **Save all** saves every tab with a dot. The bar holds only buttons: what each does
+- **The buttons on the tab bar** (right, before Settings) act on the tab you are in: **Set** (`Ctrl+S`) writes the
+  trial into the main (live) file, so Ajmashell takes it; **Set all** does it for every tab with a dot; then **Save as**
+  (`Ctrl+Shift+S`) saves the trial as a snapshot and **Open** (`Ctrl+O`) opens a snapshot into the trial. "Set" and
+  "Save" are apart on purpose: setting changes Ajmashell, saving a snapshot does not. The bar holds only buttons: what each does
   is in its tooltip, and the results (saved, the palette's steps, an error, a snapshot opened) show in a toast under
   them ("info" goes after 5 s, an error stays until a click).
 - **Snapshots** are a quick way to switch the trial between a few looks or recipes: "Save as" and "Open" show the
   system file dialog (zenity, through the desktop portal), in `~/.local/state/ajmashell/snapshots/look` or
   `…/snapshots/palette` to start with; any other place works too, and renaming or deleting a snapshot is done there.
-  "Open" fills only the trial, as a preset does; Ajmashell changes with "Save" or "Save all", which always write the
+  "Open" fills only the trial, as a preset does; Ajmashell changes with "Set" or "Set all", which always write the
   main file. While the trial still equals what was opened or saved, the captions show the snapshot's name. Look and
   palette snapshots are apart: opening a look leaves the trial recipe as it is. An opened look is the whole look (background,
   alpha, effects, gradient).
 
 ## Saving: what changes in your system
 
-"Save" saves the tab you are in; "Save all" saves every tab with a dot (its tooltip names them) after a confirmation
+"Set" sets the tab you are in; "Set all" sets every tab with a dot (its tooltip names them) after a confirmation
 that lists what each save does; Esc or a click beside the box cancels. It saves the palette first, then the other tabs
 in the order of the bar, and stops at the first error; the toast says what was saved and what not.
 
-"Save" in Palette writes the trial recipe into Ajmashell's live palette recipe file,
+"Set" in Palette writes the trial recipe into Ajmashell's live palette recipe file,
 `~/.local/state/ajmashell/palette-recipe.json` (through `palette_recipe.save()`: validated, atomic). Then, in the background,
 it runs the carousel indexer (new seeds and colour categories, the thumbnails stay) and `wpapply.sh` on the wallpaper
 on your desktop, so the desktop takes the new colours at once. The steps show under the button. The saved recipe
@@ -132,7 +133,7 @@ recipe (`wallpaper/palette-recipe-default.json`); delete the file and apply a wa
 watches the file: a change made outside it (by hand, a delete) becomes the current recipe in the window. The tool
 never writes into the Ajmashell directory.
 
-"Save" in Look writes the trial look into Ajmashell's live look file, `~/.local/state/ajmashell/look.json` (through
+"Set" in Look writes the trial look into Ajmashell's live look file, `~/.local/state/ajmashell/look.json` (through
 `look_settings.save()`: validated, atomic). Ajmashell watches the file and changes its popups at once; the file is
 outside git, so trying a look leaves no trace in the dotfiles. Delete the file to go back to Ajmashell's defaults.
 New defaults or a new preset are a change in Ajmashell's `look-options.json`, never made by this tool.
@@ -181,15 +182,15 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 
 | File | Role |
 |---|---|
-| `shell.qml` | the frame: the tab list, the tab states, "Save all" and its order, the shortcuts; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
-| `TabBar.qml`, `SaveAllDialog.qml` | the tab bar with the actions of the tab you are in (Open, Save as, Save, Save all; tooltips), the confirmation of "Save all" |
+| `shell.qml` | the frame: the tab list, the tab states, "Set all" and its order, the shortcuts; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
+| `TabBar.qml`, `SaveAllDialog.qml` | the tab bar with the actions of the tab you are in (Set, Set all, Save as, Open; tooltips), the confirmation of "Set all" |
 | `PaletteState.qml` | state of the Palette tab and the protocol with the helper (alive for the whole window, read by the other tabs) |
 | `PaletteTab.qml` | the Palette tab: the parts below |
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
 | `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
 | `LookState.qml` | state of the Look tab: the current and the trial look, presets, "Save look" (through the helper of `PaletteState`) |
 | `SnapshotStore.qml` | snapshots of one tab (one per tab state): Open, Save as, the name of the snapshot in the trial; the helper shows the dialog and writes the file |
-| `Toast.qml` | the toast under the bar: the results of a save, "Save all" and the snapshots |
+| `Toast.qml` | the toast under the bar: the results of a set, "Set all" and the snapshots |
 | `LookTab.qml`, `LookPresets.qml`, `GradientSection.qml`, `LookMock.qml` | the Look tab: previews of both looks, the presets and the builder, the gradient section, the Orbita and control centre mock-up (gradient drawn by Ajmashell's `look/GradientFill.qml`) |
 | `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml`; the look's background from the look; kitty and the border from the system's files) |
 | `SettingsTab.qml`, `SettingsState.qml` | the Settings tab: a field per path, its default, "found" / "missing" |

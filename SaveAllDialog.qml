@@ -35,7 +35,7 @@ Rectangle {
             anchors { left: parent.left; right: parent.right; top: parent.top; margins: 24 }
             spacing: 12
 
-            Text { text: "Save all trial settings?"; color: d.frame.ui.text; font { family: d.frame.ui.font; pixelSize: 16; bold: true } }
+            Text { text: "Set all trial settings?"; color: d.frame.ui.text; font { family: d.frame.ui.font; pixelSize: 16; bold: true } }
             Repeater {
                 model: d.frame.saveOrder // in the order of saving
                 Text {
@@ -51,7 +51,7 @@ Rectangle {
             Text {
                 width: col.width
                 wrapMode: Text.Wrap
-                text: "The unsaved trial settings of every tab above are saved, not only those of the tab you are in."
+                text: "The trial settings of every tab above are set, not only those of the tab you are in."
                 color: d.frame.ui.warn
                 font { family: d.frame.ui.font; pixelSize: 12 }
             }
@@ -66,7 +66,7 @@ Rectangle {
                 }
                 Chip {
                     app: d.frame
-                    label: "Save all"
+                    label: "Set all"
                     tone: d.frame.ui.trial
                     selected: true
                     onClicked: d.frame.saveAll()

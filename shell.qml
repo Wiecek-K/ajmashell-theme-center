@@ -124,12 +124,12 @@ ShellRoot {
             const name = t.title.toLowerCase();
             step = null;
             queue = queue.slice(1);
-            const failed = t.state.saveError ? "error " + t.state.saveError : !started && t.state.edited ? "not saved (busy)" : "";
+            const failed = t.state.saveError ? "error " + t.state.saveError : !started && t.state.edited ? "not set (busy)" : "";
             if (!failed) {
-                log = log.concat([name + ": saved"]);
+                log = log.concat([name + ": set"]);
                 return true;
             }
-            log = log.concat([name + ": " + failed], queue.map(q => q.title.toLowerCase() + ": not saved"));
+            log = log.concat([name + ": " + failed], queue.map(q => q.title.toLowerCase() + ": not set"));
             saveAllFailed = true;
             queue = [];
             finish();
@@ -162,10 +162,10 @@ ShellRoot {
     Connections {
         target: center
         function onSaveAllRunningChanged() {
-            if (center.saveAllRunning) toast.show({ text: "Saving all…", level: "busy" }, center);
+            if (center.saveAllRunning) toast.show({ text: "Setting all…", level: "busy" }, center);
         }
         function onSaveAllMessageChanged() {
-            toast.show(center.saveAllMessage ? { text: "Save all: " + center.saveAllMessage,
+            toast.show(center.saveAllMessage ? { text: "Set all: " + center.saveAllMessage,
                                                  level: center.saveAllFailed ? "error" : "info" } : null, center);
         }
     }
