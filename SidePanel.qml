@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
 // file), "restore current", "Save palette" with the steps after it, folder progress for both recipes,
-// the summary of what the trial changes, the last copied hex. Saved recipes under the controls (SavedSection.qml,
+// the summary of what the trial changes, the last copied hex. Snapshots of the recipe at the bottom (SavedSection.qml,
 // ticket E18). Lists and ranges of the controls come from the helper
 // (palette_recipe.options()), never copied here. On top: what each missing path stops (ticket 09; the paths are set in
 // the Settings tab). "Save palette" saves this tab, "Save all" every tab (ticket 12).
@@ -183,15 +183,6 @@ Rectangle {
                 font { family: p.app.ui.font; pixelSize: 11 }
             }
 
-            SavedSection {
-                width: parent.width
-                app: p.app
-                store: p.app.savedStore
-                trial: p.app.trial
-                active: !!p.app.trialName
-                keys: p.keys
-            }
-
             // story 51-55: one button, no commit; the steps after the file run in the helper's background
             Row {
                 spacing: 8
@@ -295,6 +286,18 @@ Rectangle {
                 text: p.app.helperError
                 color: p.app.ui.error
                 font { family: p.app.ui.font; pixelSize: 12 }
+            }
+
+            Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
+
+            SavedSection {
+                width: parent.width
+                app: p.app
+                store: p.app.savedStore
+                trial: p.app.trial
+                active: !!p.app.trialName
+                keys: p.keys
+                mainSave: "Save palette"
             }
         }
     }

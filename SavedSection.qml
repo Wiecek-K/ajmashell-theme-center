@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Saved settings in a tab's panel (ticket E18): "Save as" with a name for the trial, the list of saved names, a click
-// loads one into the trial, "×" deletes. An existing name and a delete ask with a second click on the same button
+// Snapshots in a tab's panel (ticket E18; at the bottom of the panel, user 2026-10-31): "Save as" keeps the trial
+// under a name, "open" (or a click on the name) puts a snapshot into the trial, "×" deletes it. Only the tab's own save
+// writes the main file; a snapshot is a quick way to fill the trial (user, 2026-10-31). An existing name and a delete ask with a second click on the same button
 // ("overwrite?", "delete?"; user, 2026-10-31), no dialog; it forgets the question after 4 s or at any other action.
 // No rename: load, save under the new name, delete the old one. The filled chip: the trial still equals the setting
 // it was loaded from or saved as. State: SavedStore.qml.
@@ -15,6 +16,7 @@ Column {
     property var trial      // what "Save as" keeps
     property bool active    // the trial equals store.data
     property Item keys      // gets the keys back after a save (the arrows of the Palette strip, the frame's shortcuts)
+    property string mainSave // the tab's own save button ("Save look", "Save palette"), named in the hint
     property string ask: "" // "overwrite" | "delete:<name>": the button waits for its second click
     spacing: 6
 
@@ -43,7 +45,19 @@ Column {
 
     Timer { id: timer; interval: 4000; onTriggered: s.forget() }
 
-    Text { text: "Saved (click to load into the trial)"; color: s.app.ui.dim; font { family: s.app.ui.font; pixelSize: 11 } }
+    Text {
+        text: "Snapshots"
+        color: s.app.ui.trial
+        font { family: s.app.ui.font; pixelSize: 14; bold: true }
+    }
+    Text {
+        width: s.width
+        wrapMode: Text.Wrap
+        text: "\"Save as\" keeps the trial under a name. \"open\" puts a snapshot into the trial; only \"" + s.mainSave
+              + "\" or \"Save all\" writes it to the main file."
+        color: s.app.ui.dim
+        font { family: s.app.ui.font; pixelSize: 11 }
+    }
 
     Text {
         visible: s.store.names === null
@@ -88,8 +102,8 @@ Column {
         }
     }
 
-    Flow {
-        width: s.width
+    Column {
+        // one snapshot per line: name, "open", "×"
         spacing: 6
         Repeater {
             model: s.store.names || []
@@ -102,6 +116,17 @@ Column {
                     app: s.app
                     label: item.modelData
                     selected: s.active && s.store.name === item.modelData
+                    enabled: !s.store.busy
+                    onClicked: {
+                        s.forget();
+                        s.release();
+                        s.store.load(item.modelData);
+                    }
+                }
+                Chip {
+                    app: s.app
+                    label: "open"
+                    tone: s.app.ui.accent
                     enabled: !s.store.busy
                     onClicked: {
                         s.forget();

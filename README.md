@@ -101,9 +101,10 @@ drops unsaved trial settings without asking.
   they mean depends on the style; a new style sets them to its defaults, a reach the style does not use and the angle
   of a style without a direction are greyed out). The styles and ranges come from `look-options.json` too. The previews draw the gradient
   with Ajmashell's own `look/GradientFill.qml`, loaded from the Ajmashell directory, so they match the popups.
-- **Saved** (in Look under the presets, in Palette under the controls of the trial recipe): type a name and click
-  "Save as" (or Enter) to keep the trial look or the trial recipe under that name; a click on a name loads it into the
-  trial, "×" deletes it. A name that exists already, and a delete, ask with a second click on the same button
+- **Snapshots** (at the bottom of the panel in Look and in Palette): type a name and click "Save as" (or Enter) to
+  keep the trial look or the trial recipe under that name; "open" (or a click on the name) puts it into the trial, "×"
+  deletes it. "Save look", "Save palette" and "Save all" always write only the main (live) file; a snapshot only fills
+  the trial quickly. A name that exists already, and a delete, ask with a second click on the same button
   ("overwrite?", "delete?"). Loading fills only the trial, like a preset: Ajmashell changes with "Save look" or "Save
   palette". A loaded look is the whole look (background, alpha, effects, gradient). While the trial still equals what
   was loaded or saved, the captions show its name instead of "custom", and its chip is filled. The two lists are apart:
