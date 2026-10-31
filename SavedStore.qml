@@ -19,15 +19,20 @@ Scope {
     property bool busy: false
     signal loaded(var data)
 
-    function send(type, name, extra) {
+    function send(type, entry, extra) {
+        if (palette.helperError) {
+            // no helper: no answer would come and the buttons would stay off
+            error = "the helper is not running";
+            return;
+        }
         busy = true;
         error = "";
-        palette.send(Object.assign({ type: type, kind: kind, name: name }, extra || {}));
+        palette.send(Object.assign({ type: type, kind: kind, name: entry }, extra || {}));
     }
 
-    function saveAs(name, data, overwrite) { send("saveAs", name, { data: data, overwrite: overwrite }); }
-    function load(name) { send("loadSaved", name); }
-    function remove(name) { send("deleteSaved", name); }
+    function saveAs(entry, content, overwrite) { send("saveAs", entry, { data: content, overwrite: overwrite }); }
+    function load(entry) { send("loadSaved", entry); }
+    function remove(entry) { send("deleteSaved", entry); }
 
     Connections {
         target: store.palette

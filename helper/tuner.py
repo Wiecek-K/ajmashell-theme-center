@@ -366,7 +366,8 @@ def save_look(look):
 
 
 def read_look(path):
-    """look_settings.load() of a saved look, its warnings (stderr in the module) as a list for the window."""
+    """look_settings.load() of a saved look, its warnings (stderr in the module) as a list for the window. Only the
+    main loop calls it; the workers print nothing on stderr (their failures go to the window as messages)."""
     err = io.StringIO()
     with contextlib.redirect_stderr(err):
         data = look_settings.load(path)
@@ -394,32 +395,43 @@ def saved_names():
     return {kind: saved.names(kinds[kind][2]) if kind in kinds else None for kind in ("look", "palette")}
 
 
+def saved_list(kind, where):
+    try:
+        return {"type": "savedList", "kind": kind, "names": saved.names(where)}
+    except OSError as e:
+        return {"type": "savedList", "kind": kind, "error": str(e)}
+
+
 def saved_message(msg):
-    """saveAs, loadSaved, deleteSaved: the answer always comes, an error included."""
-    kind, name, kinds = msg.get("kind"), msg.get("name"), saved_kinds()
-    answer = {"saveAs": "savedAs", "loadSaved": "savedLoaded", "deleteSaved": "savedList"}[msg["type"]]
+    """saveAs, loadSaved, deleteSaved: the answer always comes, an error included; after a save or a delete the
+    list follows."""
+    type_, kind, name, kinds = msg["type"], msg.get("kind"), msg.get("name"), saved_kinds()
+    answer = {"saveAs": "savedAs", "loadSaved": "savedLoaded", "deleteSaved": "savedList"}[type_]
     try:
         if kind not in kinds:
             raise ValueError(f"no {kind} module in the Ajmashell directory (see Settings)")
         write, read, where = kinds[kind]
         file = saved.path(where, name)
         name = saved.check_name(name)
-        if msg["type"] != "saveAs" and not os.path.isfile(file):
-            raise ValueError(f"no saved {kind} {name!r}")
-        if msg["type"] == "saveAs":
+        if type_ == "saveAs":
             if os.path.exists(file) and not msg.get("overwrite"):
                 raise ValueError(f"{name!r} exists already")
-            send({"type": answer, "kind": kind, "name": name, "data": write(msg.get("data"), file)})
-        elif msg["type"] == "loadSaved":
+            reply = {"data": write(msg.get("data"), file)}
+        elif not os.path.isfile(file):
+            raise ValueError(f"no saved {kind} {name!r}")
+        elif type_ == "loadSaved":
             data, warnings = read(file)
-            send({"type": answer, "kind": kind, "name": name, "data": data, "warnings": warnings})
-            return
+            reply = {"data": data, "warnings": warnings}
         else:
             saved.delete(where, name)
+            reply = None  # the list is the answer
     except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for the answer)
         send({"type": answer, "kind": kind, "name": name, "error": str(e) or type(e).__name__})
         return
-    send({"type": "savedList", "kind": kind, "names": saved.names(where)})
+    if reply is not None:
+        send({"type": answer, "kind": kind, "name": name, **reply})
+    if type_ != "loadSaved":
+        send(saved_list(kind, where))
 
 
 def look_state():

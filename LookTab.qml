@@ -3,8 +3,8 @@
 // every control is in the panel on the right, so the previews take the rest; user, 2026-10-30)
 // for the wallpaper selected in the Palette tab: current = the live look on the current palette recipe, trial = the
 // builder's look on the trial palette recipe (colours from PaletteState), each in LookMock.qml. Panel on the right:
-// presets and builder (LookPresets.qml), saved looks (SavedSection.qml, ticket E18), the gradient of the background under it (GradientSection.qml, ticket 14),
-// "Save look", "Save all".
+// presets and builder (LookPresets.qml), saved looks (SavedSection.qml, ticket E18), the gradient of the background
+// under it (GradientSection.qml, ticket 14), "Save look", "Save all".
 // Only the view: the state is LookState.qml in the frame.
 pragma ComponentBehavior: Bound
 import QtQuick

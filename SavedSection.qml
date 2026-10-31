@@ -23,6 +23,11 @@ Column {
 
     function forget() { ask = ""; }
 
+    // the keys back to the tab: a chip takes no focus, so the name field would keep the arrows of the Palette strip
+    function release() {
+        if (keys) keys.forceActiveFocus();
+    }
+
     function saveAs() {
         if (!typed || store.busy || !trial) return;
         if (exists && ask !== "overwrite") {
@@ -33,7 +38,7 @@ Column {
         store.saveAs(typed, trial, exists);
         ask = "";
         field.text = "";
-        if (keys) keys.forceActiveFocus();
+        release();
     }
 
     Timer { id: timer; interval: 4000; onTriggered: s.forget() }
@@ -69,7 +74,7 @@ Column {
             onAccepted: s.saveAs()
             Keys.onEscapePressed: {
                 text = "";
-                if (s.keys) s.keys.forceActiveFocus();
+                s.release();
             }
         }
         Chip {
@@ -100,6 +105,7 @@ Column {
                     enabled: !s.store.busy
                     onClicked: {
                         s.forget();
+                        s.release();
                         s.store.load(item.modelData);
                     }
                 }
@@ -110,6 +116,7 @@ Column {
                     selected: item.deleting
                     enabled: !s.store.busy
                     onClicked: {
+                        s.release();
                         if (item.deleting) {
                             s.forget();
                             s.store.remove(item.modelData);
