@@ -6,7 +6,7 @@
 // angle is greyed out in a style without a direction (`angle: false`). Styles, ranges and the roles come from
 // Ajmashell's look-options.json through the helper; the drawing is Ajmashell's look/GradientFill.qml (LookMock.qml).
 // A blue frame or mark = the current value. The style chips in a row per group of look-options.json (none, along a
-// line, from a point); styles mirror, glow, conic, vignette and the groups: ticket E16 (user, 2026-10-31).
+// line, from a point); styles mirror, glow, conic, (inverse) vignette and the groups: ticket E16 (user, 2026-10-31).
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -26,7 +26,7 @@ Column {
     readonly property var colours: app.palette.trialColors || app.palette.currentColors
     readonly property var styleNames: ({
         off: "none", linear: "linear", duo: "two-colour", bands: "bands", mirror: "mirror",
-        glow: "centre glow", corner: "corner glow", conic: "conic", vignette: "vignette"
+        glow: "centre glow", corner: "corner glow", conic: "conic", vignette: "vignette", inverseVignette: "inverse vignette"
     })
     readonly property var groupNames: ({ none: "", line: "Line", circle: "Circle" })
     // the groups in the order of their first style
@@ -40,7 +40,8 @@ Column {
         conic: "Colours turn around the centre from the angle. Reach A: where along the turn B is at its fullest; then back to A.",
         mirror: "A at both ends, B in the middle. Reach A: how wide the middle of B is.",
         glow: "A glows from the centre. Reach A: how far, a share of the way to a corner. No angle.",
-        vignette: "A frames the edges, the middle stays plain. Reach A: how thick the frame is. No angle."
+        vignette: "A frames the edges, the middle stays plain. Reach A: how thick the frame is. No angle.",
+        inverseVignette: "A fills the middle, the plain background frames the edges. Reach A: how thick the frame is. No angle."
     })
 
     // one role: a select (the chosen role; a click opens the list under it)
