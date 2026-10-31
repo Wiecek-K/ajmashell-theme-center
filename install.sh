@@ -31,6 +31,8 @@ need() {
 command -v qs >/dev/null 2>&1 || need "qs not found: install Quickshell (pacman -S quickshell)"
 # the tested version is TESTED_MATUGEN in helper/tuner.py; the version check below is the helper's own
 command -v matugen >/dev/null 2>&1 || need "matugen not found: install matugen 4.2.0 (pacman -S matugen)"
+# snapshots open and save in the system file dialog through zenity (ticket E18): without it only they are off
+command -v zenity >/dev/null 2>&1 || echo "warning: zenity not found: Open and Save as (snapshots) stay off; pacman -S zenity" >&2
 
 # With Python: the helper's own checks, so this script and the window always agree: the Ajmashell directory of the
 # settings (helper/settings.py, default ~/.config/quickshell/ajmashell) and the matugen version (a warning only).

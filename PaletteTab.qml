@@ -33,7 +33,6 @@ Item {
         id: side
         app: tab.app
         frame: tab.frame
-        keys: tab
         width: 300
         anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
     }

@@ -17,6 +17,7 @@ its scripts after a save. There is no stand-alone mode.
 | Quickshell (`qs`) | runs the window | `pacman -S quickshell` |
 | matugen 4.2.0 | computes the candidates, the seed and the palette | `pacman -S matugen` |
 | Python 3 | the helper behind the window | `pacman -S python` |
+| zenity, and a desktop portal with a file chooser (`xdg-desktop-portal-gtk`) | "Open" and "Save as" of snapshots show the system file dialog; without zenity only they are off | `pacman -S zenity xdg-desktop-portal-gtk` |
 
 Another matugen version works, but may give other palettes from the same recipe: the window shows a warning
 ("tested with matugen 4.2.0, results may differ").
@@ -76,7 +77,7 @@ saved yet. A tab keeps its state while you are in another one (trial recipe, sel
 drops unsaved trial settings without asking.
 
 - Keys: `Ctrl+1`, `Ctrl+2`… pick a tab of the bar, `Ctrl+Tab` / `Ctrl+Shift+Tab` the next / previous one, `Ctrl+,`
-  opens Settings (again: back to the tab before it). In Palette, `↑` `↓` (and `←` `→`) change the wallpaper,
+  opens Settings (again: back to the tab before it); `Ctrl+O`, `Ctrl+S`, `Ctrl+Shift+S`: the bar's buttons below. In Palette, `↑` `↓` (and `←` `→`) change the wallpaper,
   `Home` / `End` the first / last one. A click on a swatch copies its hex.
 - The controls (panel on the right) change the trial recipe: seed choice, scheme, contrast, dark palette lightness.
   Their lists and ranges come from `palette_recipe.options()`; the dark lightness has no lower limit in matugen (−∞),
@@ -101,23 +102,26 @@ drops unsaved trial settings without asking.
   they mean depends on the style; a new style sets them to its defaults, a reach the style does not use and the angle
   of a style without a direction are greyed out). The styles and ranges come from `look-options.json` too. The previews draw the gradient
   with Ajmashell's own `look/GradientFill.qml`, loaded from the Ajmashell directory, so they match the popups.
-- **Snapshots** (at the bottom of the panel in Look and in Palette): type a name and click "Save as" (or Enter) to
-  keep the trial look or the trial recipe under that name; "open" (or a click on the name) puts it into the trial, "×"
-  deletes it. "Save look", "Save palette" and "Save all" always write only the main (live) file; a snapshot only fills
-  the trial quickly. A name that exists already, and a delete, ask with a second click on the same button
-  ("overwrite?", "delete?"). Loading fills only the trial, like a preset: Ajmashell changes with "Save look" or "Save
-  palette". A loaded look is the whole look (background, alpha, effects, gradient). While the trial still equals what
-  was loaded or saved, the captions show its name instead of "custom", and its chip is filled. The two lists are apart:
-  loading a look leaves the palette recipe as it is, and the other way round.
+- **The buttons on the tab bar** (right, before Settings) act on the tab you are in: **Open** (`Ctrl+O`) opens a
+  snapshot into the trial, **Save as** (`Ctrl+Shift+S`) saves the trial as a snapshot, **Save** (`Ctrl+S`) saves the
+  trial into the main (live) file, **Save all** saves every tab with a dot. The bar holds only buttons: what each does
+  is in its tooltip, and the results (saved, the palette's steps, an error, a snapshot opened) show in a toast under
+  them ("info" goes after 5 s, an error stays until a click).
+- **Snapshots** are a quick way to switch the trial between a few looks or recipes: "Save as" and "Open" show the
+  system file dialog (zenity, through the desktop portal), in `~/.local/state/ajmashell/snapshots/look` or
+  `…/snapshots/palette` to start with; any other place works too, and renaming or deleting a snapshot is done there.
+  "Open" fills only the trial, as a preset does; Ajmashell changes with "Save" or "Save all", which always write the
+  main file. While the trial still equals what was opened or saved, the captions show the snapshot's name. Look and
+  palette snapshots are apart: opening a look leaves the trial recipe as it is. An opened look is the whole look (background,
+  alpha, effects, gradient).
 
 ## Saving: what changes in your system
 
-Each tab with trial settings has two buttons: its own save ("Save palette") and "Save all", the same in every tab.
-"Save all" saves every tab with a dot (its label names them) after a confirmation that lists what each save does;
-Esc or a click beside the box cancels. It saves the palette first, then the other tabs in the order of the bar, and
-stops at the first error; the line under the button says what was saved and what not.
+"Save" saves the tab you are in; "Save all" saves every tab with a dot (its tooltip names them) after a confirmation
+that lists what each save does; Esc or a click beside the box cancels. It saves the palette first, then the other tabs
+in the order of the bar, and stops at the first error; the toast says what was saved and what not.
 
-"Save palette" writes the trial recipe into Ajmashell's live palette recipe file,
+"Save" in Palette writes the trial recipe into Ajmashell's live palette recipe file,
 `~/.local/state/ajmashell/palette-recipe.json` (through `palette_recipe.save()`: validated, atomic). Then, in the background,
 it runs the carousel indexer (new seeds and colour categories, the thumbnails stay) and `wpapply.sh` on the wallpaper
 on your desktop, so the desktop takes the new colours at once. The steps show under the button. The saved recipe
@@ -128,16 +132,16 @@ recipe (`wallpaper/palette-recipe-default.json`); delete the file and apply a wa
 watches the file: a change made outside it (by hand, a delete) becomes the current recipe in the window. The tool
 never writes into the Ajmashell directory.
 
-"Save look" writes the trial look into Ajmashell's live look file, `~/.local/state/ajmashell/look.json` (through
+"Save" in Look writes the trial look into Ajmashell's live look file, `~/.local/state/ajmashell/look.json` (through
 `look_settings.save()`: validated, atomic). Ajmashell watches the file and changes its popups at once; the file is
 outside git, so trying a look leaves no trace in the dotfiles. Delete the file to go back to Ajmashell's defaults.
 New defaults or a new preset are a change in Ajmashell's `look-options.json`, never made by this tool.
 
-"Save as" writes one file per name next to the live files: `~/.local/state/ajmashell/saved/look/<name>.json` and
-`~/.local/state/ajmashell/saved/palette/<name>.json`, validated by the same modules (`look_settings.save()`,
-`palette_recipe.save()`). They are read the way the live files are: a field missing in an older file (one saved before
-a new gradient part, for example) takes the default, and a bad field shows a warning under the list. A name is one
-file name: at most 64 characters, no `/` or `\`, not starting with a dot. Outside git, like the live files.
+"Save as" writes a snapshot where you pick it in the dialog (a name without an extension gets `.json`), validated by
+the same modules as the main files (`look_settings.save()`, `palette_recipe.save()`). "Open" reads it the way the main
+files are read: a field missing in an older snapshot (one saved before a new gradient part, for example) takes the
+default, and a bad field is a warning in the toast; a file that is not a JSON object is refused. Snapshots under
+`~/.local/state/ajmashell/snapshots/` are outside git, like the main files.
 
 ## Settings: the paths it needs
 
@@ -178,18 +182,18 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 | File | Role |
 |---|---|
 | `shell.qml` | the frame: the tab list, the tab states, "Save all" and its order, the shortcuts; `//@ pragma AppId` gives the window class `ajmashell-theme-center` |
-| `TabBar.qml`, `SaveAllButton.qml`, `SaveAllDialog.qml` | the tab bar, the "Save all" button every tab shows, its confirmation |
+| `TabBar.qml`, `SaveAllDialog.qml` | the tab bar with the actions of the tab you are in (Open, Save as, Save, Save all; tooltips), the confirmation of "Save all" |
 | `PaletteState.qml` | state of the Palette tab and the protocol with the helper (alive for the whole window, read by the other tabs) |
 | `PaletteTab.qml` | the Palette tab: the parts below |
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
 | `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
 | `LookState.qml` | state of the Look tab: the current and the trial look, presets, "Save look" (through the helper of `PaletteState`) |
-| `SavedStore.qml`, `SavedSection.qml` | saved looks and recipes (one store per tab, the helper keeps the files): the names, "Save as", load, delete |
+| `SnapshotStore.qml` | snapshots of one tab (one per tab state): Open, Save as, the name of the snapshot in the trial; the helper shows the dialog and writes the file |
+| `Toast.qml` | the toast under the bar: the results of a save, "Save all" and the snapshots |
 | `LookTab.qml`, `LookPresets.qml`, `GradientSection.qml`, `LookMock.qml` | the Look tab: previews of both looks, the presets and the builder, the gradient section, the Orbita and control centre mock-up (gradient drawn by Ajmashell's `look/GradientFill.qml`) |
 | `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml`; the look's background from the look; kitty and the border from the system's files) |
 | `SettingsTab.qml`, `SettingsState.qml` | the Settings tab: a field per path, its default, "found" / "missing" |
 | `helper/tuner.py` | the helper: real matugen, the recipe module, the look module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
-| `helper/saved.py` | saved settings: the folder next to a live file, the name rules, the list |
 | `helper/settings.py` | the paths: defaults (the one place they are written), `settings.json`, found / missing |
 | `install.sh` | install and uninstall, see above |
 | `ajmashell-theme-center.desktop` | the launcher entry `install.sh` installs |
@@ -212,9 +216,10 @@ they stay Polish. Everything else in the window is English.
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
 - `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
   recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the
-  helper restarts in the same process), missing paths as messages, a save with its steps, the default recipe without the live file and `readRecipe`, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`; saved settings (`saveAs`, `loadSaved`, `deleteSaved`: a look and a
-  recipe under a name after a restart, overwrite only when asked, a bad look or name refused, the list without files
-  no name gives, an older file read leniently, a delete).
+  helper restarts in the same process), missing paths as messages, a save with its steps, the default recipe without the live file and `readRecipe`, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`; snapshots
+  with a stand-in zenity (`saveSnapshot`, `openSnapshot`: the file picked in the dialog, `.json` added, the dialog
+  started next to the live file, a cancel, a bad look refused, an older look and recipe read leniently, a file that is
+  no snapshot refused, a failing dialog, no zenity, no look module).
   Everything runs in a temporary directory with copies of the real `palette_recipe.py` and `look_settings.py` (from `$AJMASHELL_DIR` or
   `~/.config/quickshell/ajmashell`; the tests skip without it), stand-ins for `indexer.py` and `wpapply.sh`, and a
   stand-in `matugen` that only answers `--version`; no palette is computed. A helper that does not report its

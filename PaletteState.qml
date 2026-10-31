@@ -5,8 +5,8 @@
 // change restarts the helper, the window stays). Not visible; PaletteTab.qml is the view.
 // For the frame and the other tabs (read only): edited, busy, save(), saving, saveError, effect, saveFirst, and the colours
 // of both recipes for the selected wallpaper (currentColors, trialColors, wallpaperName). The Look tab (LookState) talks to the
-// same helper: send() and the signal message (every message of the helper). Saved palette recipes (ticket E18,
-// SavedStore.qml): a recipe kept under a name, a load fills the trial recipe.
+// same helper: send() and the signal message (every message of the helper). Snapshots (ticket E18, SnapshotStore.qml):
+// a recipe in a file the user picks, "Open" fills the trial recipe. Tab interface also: noun, status (toast), snapshots.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -46,7 +46,7 @@ Scope {
     property string applyStage: ""
     property string applyError: ""
     readonly property bool applying: applyStage === "indexer" || applyStage === "wallpaper"
-    readonly property bool trialEdited: JSON.stringify(trial) !== JSON.stringify(recipe)
+    readonly property bool trialEdited: !sameRecipe(trial, recipe)
     property string copied: ""
     // Settings (ticket 09): settings = settings.status() of the paths in use, problems = what each missing path
     // stops (shown in the Palette panel and, without wallpapers, in the middle); the Settings tab edits draft {key: text}, the
@@ -186,9 +186,10 @@ Scope {
         checkDebounce.stop();
     }
 
-    // saved palette recipes (ticket E18): a load fills the trial, as the controls do; the system file stays
-    readonly property SavedStore savedStore: SavedStore {
+    // snapshots (ticket E18): "Open" fills the trial, as the controls do; the live file stays
+    readonly property SnapshotStore snapshots: SnapshotStore {
         kind: "palette"
+        noun: app.noun
         palette: app
         onLoaded: data => {
             app.trial = JSON.parse(JSON.stringify(data));
@@ -198,15 +199,19 @@ Scope {
         }
     }
 
-    // the saved recipe the trial was loaded from or saved as, while the trial still equals it; else ""
-    readonly property string trialName: savedStore.name && sameRecipe(trial, savedStore.data) ? savedStore.name : ""
+    // the snapshot the trial was opened from or saved as, while the trial still equals it; else ""
+    readonly property string trialName: snapshots.name && sameRecipe(trial, snapshots.data) ? snapshots.name : ""
 
+    // equal recipes whatever the order of their keys (the helper sends them sorted, a recipe file keeps its own order)
     function sameRecipe(a, b) {
-        if (!a || !b) return false;
-        for (const section in b)
-            for (const key in b[section])
-                if (!a[section] || a[section][key] !== b[section][key]) return false;
-        return true;
+        return canonical(a) === canonical(b);
+    }
+
+    // sections and fields sorted by name (JSON.stringify of the QML engine ignores the order of a key list)
+    function canonical(recipe) {
+        if (!recipe) return "";
+        return Object.keys(recipe).sort().map(section => section + ":" + Object.keys(recipe[section]).sort()
+            .map(key => key + "=" + JSON.stringify(recipe[section][key])).join(",")).join(";");
     }
 
     function restore() {
@@ -324,6 +329,15 @@ Scope {
     readonly property bool busy: saving || applying || restarting
     readonly property bool saveFirst: true   // "Save all" saves the palette first: longest, fails most often
     readonly property string effect: "writes the palette recipe file, rebuilds the carousel index and recolours the current wallpaper"
+    readonly property string noun: "palette recipe"
+    // the save and the steps after it for the toast; null = nothing to say
+    readonly property var status: saving ? { text: "Saving the palette recipe…", level: "busy" }
+                                  : saveError ? { text: "Palette recipe not saved: " + saveError, level: "error" }
+                                  : applyStage === "indexer" ? { text: "Palette recipe saved. Rebuilding the carousel index…", level: "busy" }
+                                  : applyStage === "wallpaper" ? { text: "Applying the new recipe to the current wallpaper…", level: "busy" }
+                                  : applyStage === "done" ? { text: "Palette recipe saved and applied to the desktop. No commit in the dotfiles.", level: "info" }
+                                  : applyStage === "error" ? { text: "Palette recipe saved, but applying it failed: " + applyError, level: "error" }
+                                  : null
     readonly property string wallpaperName: it ? it.fileName : ""
     readonly property var currentColors: colorsOf(fingerprint)
     readonly property var trialColors: colorsOf(trialFingerprint)

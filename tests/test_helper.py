@@ -347,104 +347,108 @@ class Helper(unittest.TestCase):
         self.send({"type": "readLook"})
         self.assertEqual(self.expect("lookRead")["current"], defaults)
 
-    # Saved settings (ticket E18): a look or a palette recipe under a name, next to the module's live file
+    # Snapshots (ticket E18): a look or a palette recipe in a file the user picks in the system file dialog (zenity),
+    # next to the module's live file by default. The stand-in zenity answers what the test wrote into zenity-answer
+    # (exit code, then the path) and logs its arguments.
 
-    def restart_helper(self):
-        """The window closed and opened again: a new helper, a new "ready"."""
-        self.proc.kill()
-        self.proc.wait()
-        self.proc.stdin.close()
-        self.proc.stdout.close()
-        return self.start()
+    def stub_zenity(self, code, chosen=""):
+        stub = os.path.join(self.bin, "zenity")
+        with open(stub, "w") as f:
+            f.write(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {self.path('zenity-args')!r}\n"
+                    f"printf '%s\\n' {chosen!r}\nexit {code}\n")
+        os.chmod(stub, 0o755)
 
-    def test_save_as_keeps_a_look_under_its_name_after_a_restart(self):
-        self.assertEqual(self.start()["saved"], {"look": [], "palette": []})
-        self.send({"type": "saveAs", "kind": "look", "name": "violet vignette", "data": STILL})
-        self.assertEqual(self.expect("savedAs"), {"type": "savedAs", "kind": "look", "name": "violet vignette",
-                                                  "data": STILL})
-        self.assertEqual(self.expect("savedList")["names"], ["violet vignette"])
-        with open(self.path("state/saved/look/violet vignette.json")) as f:
+    def zenity_args(self):
+        with open(self.path("zenity-args")) as f:
+            return f.read().splitlines()
+
+    def test_ready_says_whether_snapshots_work(self):
+        self.stub_zenity(1)
+        ready = self.start()
+        self.assertEqual(ready["snapshots"], {"look": True, "palette": True})
+        self.assertIsNone(ready["snapshotWarning"])
+
+    def test_without_zenity_snapshots_are_off_with_a_warning(self):
+        self.only_bin = True
+        ready = self.start()
+        self.assertEqual(ready["snapshots"], {"look": False, "palette": False})
+        self.assertIn("zenity", ready["snapshotWarning"])
+        self.send({"type": "openSnapshot", "kind": "look"})
+        self.assertIn("zenity", self.expect("snapshotOpened")["error"])
+
+    def test_save_snapshot_writes_the_file_picked_in_the_dialog(self):
+        self.stub_zenity(0, self.path("mine/violet"))  # typed without the extension
+        self.start()
+        self.send({"type": "saveSnapshot", "kind": "look", "data": STILL})
+        saved = self.expect("snapshotSaved")
+        self.assertEqual(saved, {"type": "snapshotSaved", "kind": "look", "file": self.path("mine/violet.json"),
+                                 "name": "violet", "data": STILL})
+        with open(self.path("mine/violet.json")) as f:
             self.assertEqual(json.load(f), STILL)
         with open(self.look_file) as f:
             self.assertEqual(json.load(f), STILL)  # the live file is not touched
-        self.assertEqual(self.restart_helper()["saved"]["look"], ["violet vignette"])
+        args = self.zenity_args()
+        self.assertIn("--save", args)
+        self.assertIn("--filename=" + self.path("state/snapshots/look") + "/", args)  # next to the live file
+        self.assertTrue(os.path.isdir(self.path("state/snapshots/look")))
 
-    def test_an_existing_name_is_overwritten_only_when_asked(self):
-        self.write(self.path("state/saved/look/mine.json"), STILL)
+    def test_a_cancelled_dialog_saves_nothing(self):
+        self.stub_zenity(1)
         self.start()
-        other = dict(STILL, alpha=0.7)
-        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": other})
-        self.assertIn("exists", self.expect("savedAs")["error"])
-        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": other, "overwrite": True})
-        self.assertEqual(self.expect("savedAs")["data"], other)
-        with open(self.path("state/saved/look/mine.json")) as f:
-            self.assertEqual(json.load(f)["alpha"], 0.7)
+        self.send({"type": "saveSnapshot", "kind": "palette", "data": VIBRANT})
+        self.assertEqual(self.expect("snapshotSaved"), {"type": "snapshotSaved", "kind": "palette", "cancelled": True})
 
-    def test_a_bad_look_is_not_saved_under_a_name(self):
+    def test_a_bad_look_is_refused_and_no_file_is_written(self):
+        self.stub_zenity(0, self.path("bad.json"))
         self.start()
-        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": dict(STILL, alpha=0.2)})
-        self.assertIn("alpha", self.expect("savedAs")["error"])
-        self.assertFalse(os.path.exists(self.path("state/saved/look/mine.json")))
+        self.send({"type": "saveSnapshot", "kind": "look", "data": dict(STILL, alpha=0.2)})
+        self.assertIn("alpha", self.expect("snapshotSaved")["error"])
+        self.assertFalse(os.path.exists(self.path("bad.json")))
 
-    def test_a_name_that_is_no_file_name_is_refused(self):
-        self.start()
-        for name in ["", "   ", "../look", "a/b", ".hidden", "x" * 65, "tab\there"]:
-            self.send({"type": "saveAs", "kind": "look", "name": name, "data": STILL})
-            self.assertIn("error", self.expect("savedAs"), name)
-        self.assertFalse(os.path.exists(self.path("state/look.json.json")))
-        self.assertEqual(os.listdir(self.path("state")), ["look.json"])
-
-    def test_the_list_leaves_out_files_no_name_gives_and_sorts_without_case(self):
-        for f in ["b.json", "A.json", ".x.json", ".look.json.1a2b", "notes.txt"]:
-            self.write(self.path("state/saved/look/" + f), STILL)
-        self.assertEqual(self.start()["saved"]["look"], ["A", "b"])
-
-    def test_a_saved_look_loads_leniently_like_the_live_file(self):
-        defaults = self.start()["lookSettings"]["options"]["defaults"]
-        old = {k: v for k, v in STILL.items() if k not in ("gradient", "blur")}  # before tickets 14 and the blur flag
+    def test_open_snapshot_reads_an_older_look_leniently(self):
+        defaults = None
+        old = {k: v for k, v in STILL.items() if k not in ("gradient", "blur")}  # before ticket 14 and the blur flag
         old["alpha"] = 3
-        self.write(self.path("state/saved/look/old.json"), old)
-        self.send({"type": "loadSaved", "kind": "look", "name": "old"})
-        loaded = self.expect("savedLoaded")
-        self.assertEqual(loaded["data"], dict(STILL, alpha=defaults["alpha"], blur=defaults["blur"],
+        self.write(self.path("old.json"), old)
+        self.stub_zenity(0, self.path("old.json"))
+        defaults = self.start()["lookSettings"]["options"]["defaults"]
+        self.send({"type": "openSnapshot", "kind": "look"})
+        opened = self.expect("snapshotOpened")
+        self.assertEqual(opened["name"], "old")
+        self.assertEqual(opened["data"], dict(STILL, alpha=defaults["alpha"], blur=defaults["blur"],
                                               gradient=defaults["gradient"]))
-        self.assertEqual(len(loaded["warnings"]), 1)
-        self.assertIn("alpha", loaded["warnings"][0])
+        self.assertEqual(len(opened["warnings"]), 1)
+        self.assertIn("alpha", opened["warnings"][0])
+        self.assertNotIn("--save", self.zenity_args())
 
-    def test_loading_a_missing_name_is_an_error(self):
+    def test_open_snapshot_reads_a_recipe_over_the_default_recipe(self):
+        self.write(self.path("old.json"), {"seed": {"rule": "darkness"}, "palette": {"scheme": "scheme-vibrant"}})
+        self.stub_zenity(0, self.path("old.json"))
         self.start()
-        self.send({"type": "loadSaved", "kind": "look", "name": "gone"})
-        self.assertIn("gone", self.expect("savedLoaded")["error"])
+        self.send({"type": "openSnapshot", "kind": "palette"})
+        self.assertEqual(self.expect("snapshotOpened")["data"],
+                         {"seed": {"rule": "darkness"}, "palette": dict(NEUTRAL["palette"], scheme="scheme-vibrant")})
 
-    def test_delete_removes_the_file_and_sends_the_list(self):
-        self.write(self.path("state/saved/look/a.json"), STILL)
-        self.write(self.path("state/saved/look/b.json"), STILL)
+    def test_a_file_that_is_no_snapshot_is_an_error_not_the_defaults(self):
+        with open(self.path("notes.json"), "w") as f:
+            f.write("not json")
+        self.stub_zenity(0, self.path("notes.json"))
         self.start()
-        self.send({"type": "deleteSaved", "kind": "look", "name": "a"})
-        self.assertEqual(self.expect("savedList"), {"type": "savedList", "kind": "look", "names": ["b"]})
-        self.send({"type": "deleteSaved", "kind": "look", "name": "a"})
-        self.assertIn("error", self.expect("savedList"))
+        self.send({"type": "openSnapshot", "kind": "look"})
+        self.assertIn("JSON", self.expect("snapshotOpened")["error"])
 
-    def test_a_palette_recipe_is_saved_and_loaded_apart_from_the_look(self):
+    def test_a_failing_dialog_is_an_error(self):
+        self.stub_zenity(5)
         self.start()
-        self.send({"type": "saveAs", "kind": "palette", "name": "vibrant", "data": VIBRANT})
-        self.assertEqual(self.expect("savedAs")["data"], VIBRANT)
-        self.assertEqual(self.expect("savedList"), {"type": "savedList", "kind": "palette", "names": ["vibrant"]})
-        self.assertTrue(os.path.isfile(self.path("saved/palette/vibrant.json")))  # next to the live recipe file
-        # an older recipe without the dark lightness: the default recipe's value
-        self.write(self.path("saved/palette/old.json"), {"seed": {"rule": "darkness"}, "palette": {"scheme": "scheme-vibrant"}})
-        self.send({"type": "loadSaved", "kind": "palette", "name": "old"})
-        self.assertEqual(self.expect("savedLoaded")["data"],
-                         {"seed": {"rule": "darkness"},
-                          "palette": dict(NEUTRAL["palette"], scheme="scheme-vibrant")})
-        self.assertEqual(self.restart_helper()["saved"], {"look": [], "palette": ["old", "vibrant"]})
+        self.send({"type": "openSnapshot", "kind": "look"})
+        self.assertIn("zenity", self.expect("snapshotOpened")["error"])
 
-    def test_without_the_look_module_saved_looks_are_off_not_a_crash(self):
+    def test_without_the_look_module_look_snapshots_are_off(self):
         os.remove(os.path.join(self.shell, "singletons", "look", "look_settings.py"))
-        self.assertEqual(self.start()["saved"], {"look": None, "palette": []})
-        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": STILL})
-        self.assertIn("look", self.expect("savedAs")["error"])
-
+        self.stub_zenity(1)
+        self.assertEqual(self.start()["snapshots"], {"look": False, "palette": True})
+        self.send({"type": "saveSnapshot", "kind": "look", "data": STILL})
+        self.assertIn("look", self.expect("snapshotSaved")["error"])
 
 if __name__ == "__main__":
     unittest.main()

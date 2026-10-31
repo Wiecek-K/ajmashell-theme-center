@@ -26,11 +26,11 @@
 #       the file and changes at once (ticket 13).
 #   {"type": "readLook"}   the live look file again: the window saw it change (a hand edit, a delete)
 #   {"type": "readRecipe"}   the palette recipe again: the window saw its live file change (a hand edit, a delete)
-#   {"type": "saveAs", "kind": "look" | "palette", "name": text, "data": {...}, "overwrite": bool}
-#       keep a look or a palette recipe under a name (ticket E18, saved.py): the module's strict save into
-#       <live file's folder>/saved/<kind>/<name>.json; an existing name only with "overwrite". The live file stays.
-#   {"type": "loadSaved", "kind", "name"}   read a saved setting the way the module reads its live file (lenient)
-#   {"type": "deleteSaved", "kind", "name"}
+#   {"type": "saveSnapshot", "kind": "look" | "palette", "data": {...}}
+#   {"type": "openSnapshot", "kind": "look" | "palette"}
+#       a snapshot (ticket E18): the system file dialog (zenity) in <live file's folder>/snapshots/<kind>, then the
+#       module's strict save into the picked file, or its lenient load (as of the live file). The live file stays.
+#       One dialog at a time, in a thread of its own (it waits for the user).
 #   {"type": "check", "paths": {key: text}}   status of paths typed in the Settings panel, nothing saved
 #   {"type": "settings", "paths": {key: text}}
 #       save the settings (settings.save: atomic, an empty path = the default), then the helper restarts itself in the
@@ -48,15 +48,16 @@
 #    "settingsFile": path, "settingsWarning": text | null,   (a broken settings.json: the defaults are used)
 #    "problems": [text],   (each missing path with what it stops; shown in the window)
 #    "matugenWarning": text | null,   (matugen missing or not 4.2.x: shown in the window, nothing blocked)
-#    "lookSettings": {"options": {...}, "current": {...}, "file": path, "gradientFill": path | null} | null}
+#    "lookSettings": {"options": {...}, "current": {...}, "file": path, "gradientFill": path | null} | null,
 #       (the Look tab, ticket 13: look_settings.options() and load() of <ajmashellDir>/singletons/look; null without
 #       the module, see "problems"; ticket 14: <ajmashellDir>/look/GradientFill.qml, which the previews load to draw
-#       the gradient, null without it)
-#    "saved": {"look": [name] | null, "palette": [name] | null}   (saved settings, ticket E18; null without the module)
-#   {"type": "savedAs", "kind", "name", "data": {...}} | {"type": "savedAs", "kind", "name", "error": text}
-#       (the validated setting, or why it was not saved; on success a "savedList" follows)
-#   {"type": "savedLoaded", "kind", "name", "data": {...}, "warnings": [text]} | {…, "error": text}
-#   {"type": "savedList", "kind", "names": [name]} | {…, "error": text}   (after a save and a delete)
+#       the gradient, null without it),
+#    "snapshots": {"look": bool, "palette": bool}, "snapshotWarning": text | null}
+#       (ticket E18: a kind works with its module and zenity; the warning: zenity missing)
+#   {"type": "snapshotSaved", "kind", "file", "name", "data": {...}} | {"type": "snapshotSaved", "kind", "cancelled": true}
+#       | {"type": "snapshotSaved", "kind", "error": text}   (name = the file name without its extension)
+#   {"type": "snapshotOpened", "kind", "file", "name", "data": {...}, "warnings": [text]} | {…, "cancelled": true}
+#       | {…, "error": text}   (warnings: a bad or missing field, read as the live file is)
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
 #   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
@@ -81,6 +82,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -88,7 +90,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.dont_write_bytecode = True  # no __pycache__ in the Ajmashell install
-import saved  # noqa: E402
 import settings  # noqa: E402
 
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
@@ -97,12 +98,14 @@ WORKERS = max(1, (os.cpu_count() or 2) // 2)
 TESTED_MATUGEN = "4.2.0"  # any 4.2.x is fine; another version gives a warning in the window
 TESTED_NOTE = f"tested with matugen {TESTED_MATUGEN}, results may differ"
 NO_MODULE = "the Ajmashell directory has no palette recipe module (see Settings)"
+NO_ZENITY = "zenity not found: install zenity (pacman -S zenity) to open and save snapshots in the system file dialog"
 NO_LOOK_MODULE = "the Ajmashell directory has no look module (singletons/look/look_settings.py; see Settings)"
 
 PATHS = {}              # settings.load(): key -> path
 palette_recipe = None   # <ajmashellDir>/wallpaper/palette_recipe.py, imported in main()
 indexer = None          # <ajmashellDir>/wallpaper/indexer.py (color_bucket: carousel thresholds = colour category)
 look_settings = None    # <ajmashellDir>/singletons/look/look_settings.py (the Look tab), imported in main()
+dialog = None           # the open file dialog (zenity), closed with the window
 
 out_lock = threading.Lock()
 
@@ -366,8 +369,9 @@ def save_look(look):
 
 
 def read_look(path):
-    """look_settings.load() of a saved look, its warnings (stderr in the module) as a list for the window. Only the
-    main loop calls it; the workers print nothing on stderr (their failures go to the window as messages)."""
+    """look_settings.load() of a snapshot, its warnings (stderr in the module) as a list for the window. Only the
+    snapshot thread calls it while the main loop reads stdin; the workers print nothing on stderr (their failures go
+    to the window as messages)."""
     err = io.StringIO()
     with contextlib.redirect_stderr(err):
         data = look_settings.load(path)
@@ -380,58 +384,82 @@ def read_recipe(path):
     return data, [w.removeprefix("palette_recipe: ") for w in warnings]
 
 
-def saved_kinds():
-    """{kind: (strict save, lenient read, folder)} of the saved settings (ticket E18), for the modules in use."""
+def snapshot_kinds():
+    """{kind: (strict save, lenient read, default folder)} of the snapshots (ticket E18), for the modules in use. The
+    folder sits next to the module's live file: ~/.local/state/ajmashell/snapshots/<kind>."""
     out = {}
     if look_settings:
-        out["look"] = (look_settings.save, read_look, saved.folder(look_settings.DEFAULT_PATH, "look"))
+        out["look"] = (look_settings.save, read_look,
+                       os.path.join(os.path.dirname(look_settings.DEFAULT_PATH), "snapshots", "look"))
     if palette_recipe:
-        out["palette"] = (palette_recipe.save, read_recipe, saved.folder(palette_recipe.DEFAULT_PATH, "palette"))
+        out["palette"] = (palette_recipe.save, read_recipe,
+                          os.path.join(os.path.dirname(palette_recipe.DEFAULT_PATH), "snapshots", "palette"))
     return out
 
 
-def saved_names():
-    kinds = saved_kinds()
-    return {kind: saved.names(kinds[kind][2]) if kind in kinds else None for kind in ("look", "palette")}
+def snapshot_state():
+    """The snapshot part of "ready": which kinds work, and why none does (no zenity)."""
+    kinds = snapshot_kinds()
+    tool = shutil.which("zenity")
+    warning = None if tool else NO_ZENITY
+    return {kind: bool(tool) and kind in kinds for kind in ("look", "palette")}, warning
 
 
-def saved_list(kind, where):
+def file_dialog(kind, folder, save):
+    """The system file dialog (zenity, through the desktop portal): the picked path, None when cancelled. A save path
+    without an extension gets .json."""
+    os.makedirs(folder, exist_ok=True)
+    title = ("Save the trial " if save else "Open a snapshot of the ") + ("look" if kind == "look" else "palette recipe")
+    cmd = ["zenity", "--file-selection", "--title=" + title, "--filename=" + folder + "/",
+           "--file-filter=Snapshots (*.json) | *.json", "--file-filter=All files | *"]
+    if save:
+        cmd.append("--save")
+    global dialog
+    dialog = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out, err = dialog.communicate()
+    code, dialog = dialog.returncode, None
+    if code == 1:
+        return None
+    path = out.strip()
+    if code != 0 or not path:
+        raise ValueError(f"zenity failed (exit {code}): {err.strip().splitlines()[-1] if err.strip() else 'no path'}")
+    if save and not os.path.splitext(path)[1]:
+        path += ".json"
+    return path
+
+
+def snapshot_message(msg):
+    """openSnapshot, saveSnapshot: the file dialog, then the module of the kind; the answer always comes, an error or
+    a cancel included. Runs in the snapshot thread: the dialog waits for the user."""
+    type_, kind = msg["type"], msg.get("kind")
+    answer = {"openSnapshot": "snapshotOpened", "saveSnapshot": "snapshotSaved"}[type_]
     try:
-        return {"type": "savedList", "kind": kind, "names": saved.names(where)}
-    except OSError as e:
-        return {"type": "savedList", "kind": kind, "error": str(e)}
-
-
-def saved_message(msg):
-    """saveAs, loadSaved, deleteSaved: the answer always comes, an error included; after a save or a delete the
-    list follows."""
-    type_, kind, name, kinds = msg["type"], msg.get("kind"), msg.get("name"), saved_kinds()
-    answer = {"saveAs": "savedAs", "loadSaved": "savedLoaded", "deleteSaved": "savedList"}[type_]
-    try:
+        if not shutil.which("zenity"):
+            raise ValueError(NO_ZENITY)
+        kinds = snapshot_kinds()
         if kind not in kinds:
             raise ValueError(f"no {kind} module in the Ajmashell directory (see Settings)")
-        write, read, where = kinds[kind]
-        file = saved.path(where, name)
-        name = saved.check_name(name)
-        if type_ == "saveAs":
-            if os.path.exists(file) and not msg.get("overwrite"):
-                raise ValueError(f"{name!r} exists already")
+        write, read, folder = kinds[kind]
+        file = file_dialog(kind, folder, type_ == "saveSnapshot")
+        if file is None:
+            send({"type": answer, "kind": kind, "cancelled": True})
+            return
+        if type_ == "saveSnapshot":
             reply = {"data": write(msg.get("data"), file)}
-        elif not os.path.isfile(file):
-            raise ValueError(f"no saved {kind} {name!r}")
-        elif type_ == "loadSaved":
+        else:
+            # a file that is no JSON object is not a snapshot: an error, not the defaults the lenient load would give
+            with open(file, encoding="utf-8") as f:
+                try:
+                    if not isinstance(json.load(f), dict):
+                        raise ValueError
+                except ValueError:
+                    raise ValueError(f"{file} is not a snapshot (not a JSON object)") from None
             data, warnings = read(file)
             reply = {"data": data, "warnings": warnings}
-        else:
-            saved.delete(where, name)
-            reply = None  # the list is the answer
     except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for the answer)
-        send({"type": answer, "kind": kind, "name": name, "error": str(e) or type(e).__name__})
+        send({"type": answer, "kind": kind, "error": str(e) or type(e).__name__})
         return
-    if reply is not None:
-        send({"type": answer, "kind": kind, "name": name, **reply})
-    if type_ != "loadSaved":
-        send(saved_list(kind, where))
+    send({"type": answer, "kind": kind, "file": file, "name": os.path.splitext(os.path.basename(file))[0], **reply})
 
 
 def look_state():
@@ -518,6 +546,7 @@ def main():
     items = load_items()
     current = current_wallpaper()
     recipe, recipe_warnings = system_recipe() if palette_recipe else (None, [])
+    snapshots, snapshot_warning = snapshot_state()
     send({"type": "ready",
           "items": [{k: i[k] for k in ("fileName", "path", "thumb")} for i in items],
           "current": next((i["fileName"] for i in items if i["path"] == current), None),
@@ -526,12 +555,13 @@ def main():
           "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
           "recipeFile": palette_recipe.DEFAULT_PATH if palette_recipe else None,
           "problems": problems, "matugenWarning": matugen_warning(),
-          "lookSettings": look_state() if look_settings else None, "saved": saved_names()})
+          "lookSettings": look_state() if look_settings else None, "snapshots": snapshots, "snapshotWarning": snapshot_warning})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
         pool.submit(queue.work)
     saver = ThreadPoolExecutor(max_workers=1)  # in the background, one save after another
+    dialogs = ThreadPoolExecutor(max_workers=1)  # a file dialog waits for the user: one at a time, apart from saves
     for line in sys.stdin:
         try:
             msg = json.loads(line)
@@ -551,8 +581,8 @@ def main():
             send({"type": "lookRead", "current": look_settings.load()})
         elif msg.get("type") == "saveLook":
             save_look(msg.get("look"))  # one small file: at once, not behind a palette save
-        elif msg.get("type") in ("saveAs", "loadSaved", "deleteSaved"):
-            saved_message(msg)  # small files: at once, like saveLook
+        elif msg.get("type") in ("openSnapshot", "saveSnapshot"):
+            dialogs.submit(snapshot_message, msg)
         elif msg.get("type") == "check":
             try:
                 send({"type": "checked", "settings": settings.status(settings.resolve(msg.get("paths") or {}))})
@@ -565,6 +595,8 @@ def main():
                 send({"type": "settingsSaved", "error": str(e)})
             else:
                 restart()
+    if dialog:
+        dialog.kill()  # window closed: its file dialog goes too
     os._exit(0)  # window closed: drop the queue, do not wait for running matugen calls
 
 

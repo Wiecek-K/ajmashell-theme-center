@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
-// file), "restore current", "Save palette" with the steps after it, folder progress for both recipes,
-// the summary of what the trial changes, the last copied hex. Snapshots of the recipe at the bottom (SavedSection.qml,
-// ticket E18). Lists and ranges of the controls come from the helper
-// (palette_recipe.options()), never copied here. On top: what each missing path stops (ticket 09; the paths are set in
-// the Settings tab). "Save palette" saves this tab, "Save all" every tab (ticket 12).
+// file), "restore current", folder progress for both recipes, the summary of what the trial changes, the last copied
+// hex. Lists and ranges of the controls come from the helper (palette_recipe.options()), never copied here. On top:
+// what each missing path stops (ticket 09; the paths are set in the Settings tab). Save, "Save all" and the snapshots
+// are buttons of the tab bar, their results in the toast (ticket E18).
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -13,7 +12,6 @@ Rectangle {
     id: p
     property var app
     property var frame
-    property Item keys     // the tab: gets the keys back after "Save as"
     color: app.ui.panel
 
     readonly property var r: app.recipe
@@ -102,7 +100,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width - restoreTrial.width - 8
                     elide: Text.ElideRight
-                    text: "Trial recipe" + (p.app.trialName ? " · " + p.app.trialName : "")
+                    text: "Trial recipe" + (p.app.trialName ? " · " + p.app.trialName : "")  // the snapshot it came from
                     color: p.app.ui.trial
                     font { family: p.app.ui.font; pixelSize: 14; bold: true }
                 }
@@ -183,34 +181,6 @@ Rectangle {
                 font { family: p.app.ui.font; pixelSize: 11 }
             }
 
-            // story 51-55: one button, no commit; the steps after the file run in the helper's background
-            Row {
-                spacing: 8
-                Chip {
-                    app: p.app
-                    label: p.app.saving ? "saving…" : "Save palette"
-                    tone: p.app.ui.trial
-                    selected: p.app.trialEdited && !p.app.saving && !p.app.applying
-                    enabled: selected
-                    onClicked: p.app.saveTrial()
-                }
-                SaveAllButton { frame: p.frame; width: col.width - x }
-            }
-            Text {
-                readonly property var stages: ({ indexer: "Palette recipe file saved. Rebuilding the carousel index…",
-                                                 wallpaper: "Applying the new recipe to the current wallpaper…",
-                                                 done: "Saved and applied to the desktop. No commit in the dotfiles.",
-                                                 error: "File saved, but applying it failed: " })
-                visible: text !== ""
-                width: parent.width
-                wrapMode: Text.Wrap
-                text: p.app.saveError ? "Not saved: " + p.app.saveError
-                      : p.app.applyStage ? stages[p.app.applyStage] + (p.app.applyStage === "error" ? p.app.applyError : "") : ""
-                color: p.app.saveError || p.app.applyStage === "error" ? p.app.ui.error
-                       : p.app.applying ? p.app.ui.text : p.app.ui.dim
-                font { family: p.app.ui.font; pixelSize: 12 }
-            }
-
             Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
 
             Text {
@@ -286,18 +256,6 @@ Rectangle {
                 text: p.app.helperError
                 color: p.app.ui.error
                 font { family: p.app.ui.font; pixelSize: 12 }
-            }
-
-            Rectangle { width: parent.width; height: 1; color: p.app.ui.line }
-
-            SavedSection {
-                width: parent.width
-                app: p.app
-                store: p.app.savedStore
-                trial: p.app.trial
-                active: !!p.app.trialName
-                keys: p.keys
-                mainSave: "Save palette"
             }
         }
     }

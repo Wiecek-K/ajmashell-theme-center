@@ -3,8 +3,8 @@
 // every control is in the panel on the right, so the previews take the rest; user, 2026-10-30)
 // for the wallpaper selected in the Palette tab: current = the live look on the current palette recipe, trial = the
 // builder's look on the trial palette recipe (colours from PaletteState), each in LookMock.qml. Panel on the right:
-// presets and builder (LookPresets.qml), the gradient of the background under it (GradientSection.qml, ticket 14),
-// "Save look", "Save all", and at the bottom the snapshots (SavedSection.qml, ticket E18).
+// presets and builder (LookPresets.qml), the gradient of the background under it (GradientSection.qml, ticket 14).
+// Save, "Save all" and the snapshots are buttons of the tab bar, their results in the toast (ticket E18).
 // Only the view: the state is LookState.qml in the frame.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -91,43 +91,6 @@ Item {
                     text: "The previews draw no gradient: the Ajmashell directory has no look/GradientFill.qml (see Settings)."
                     color: tab.app.ui.error
                     font { family: tab.app.ui.font; pixelSize: 11 }
-                }
-
-                Rectangle { width: parent.width; height: 1; color: tab.app.ui.line }
-
-                Row {
-                    spacing: 8
-                    Chip {
-                        app: tab.app
-                        label: tab.app.saving ? "saving…" : "Save look"
-                        tone: tab.app.ui.trial
-                        selected: tab.app.edited && !tab.app.busy
-                        enabled: selected
-                        onClicked: tab.app.save()
-                    }
-                    SaveAllButton { frame: tab.frame; width: col.width - x }
-                }
-                Text {
-                    visible: text !== ""
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: tab.app.saveError ? "Not saved: " + tab.app.saveError
-                          : tab.app.saved ? "Saved. Ajmashell shows the new look now. No commit in the dotfiles." : ""
-                    color: tab.app.saveError ? tab.app.ui.error : tab.app.ui.dim
-                    font { family: tab.app.ui.font; pixelSize: 12 }
-                }
-
-                Rectangle { visible: !!tab.app.options; width: parent.width; height: 1; color: tab.app.ui.line }
-
-                SavedSection {
-                    visible: !!tab.app.options
-                    width: col.width
-                    app: tab.app
-                    store: tab.app.savedStore
-                    trial: tab.app.trial
-                    active: tab.app.same(tab.app.trial, tab.app.savedStore.data)
-                    keys: tab
-                    mainSave: "Save look"
                 }
             }
         }

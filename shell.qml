@@ -2,11 +2,12 @@
 pragma ComponentBehavior: Bound
 //@ pragma AppId ajmashell-theme-center
 // Ajmashell Theme Center: the frame (ticket 12, ADR 0020). Tab bar at the top, the tabs below, "Save all" with its
-// modal. The tab list below drives all of it; a tab = a view file and a state object (or the state of another tab).
+// modal; the actions of the tab you are in on the bar (Open, Save as, Save; ticket E18) and the toast with their results. The tab list below drives all of it; a tab = a view file and a state object (or the state of another tab).
 // The states are created here at start and live until the window closes, together with the helper of PaletteState;
 // a view is created when its tab opens first, then stays alive hidden.
 // Tab state interface (read only for the frame): edited (trial differs from current), busy, save(), saving, saveError,
-// effect (one sentence for the modal), optional saveFirst, note and alert (bar), leave() (called when the tab is left).
+// effect (one sentence for the modal), optional saveFirst, note and alert (bar), leave() (called when the tab is left),
+// optional noun, trial, status ({text, level} for the toast) and snapshots (SnapshotStore: Open, Save as).
 // Start: qs -n -p ~/Projects/ajmashell-theme-center (the .desktop entry does the same).
 import QtQuick
 import Quickshell
@@ -29,8 +30,22 @@ ShellRoot {
         readonly property var tabs: [
             { title: "Palette", source: "PaletteTab.qml", state: palette },
             { title: "Look", source: "LookTab.qml", state: look },
-            { title: "Settings", source: "SettingsTab.qml", state: settings, right: true }
+            { title: "Settings", source: "SettingsTab.qml", state: settings, right: true,
+              tip: "The paths Theme Center needs (Ctrl+,)." }
         ]
+        readonly property var tab: tabs[current].state
+
+        // the actions of the tab you are in (bar buttons and Ctrl+O, Ctrl+S, Ctrl+Shift+S; ticket E18)
+        readonly property bool canSaveTab: typeof tab.save === "function" && tab.edited && !tab.busy && !saveAllRunning
+        function saveTab() {
+            if (canSaveTab) tab.save();
+        }
+        function openSnapshot() {
+            if (tab.snapshots) tab.snapshots.open();
+        }
+        function saveSnapshot() {
+            if (tab.snapshots && tab.trial) tab.snapshots.saveAs(tab.trial);
+        }
         property int current: 0
         property int previous: 0
 
@@ -139,6 +154,22 @@ ShellRoot {
         }
     }
 
+    // results for the toast: each tab's save, each tab's snapshots, "Save all"
+    Connections { target: palette; function onStatusChanged() { toast.show(palette.status, palette); } }
+    Connections { target: look; function onStatusChanged() { toast.show(look.status, look); } }
+    Connections { target: palette.snapshots; function onStatusChanged() { toast.show(palette.snapshots.status, palette.snapshots); } }
+    Connections { target: look.snapshots; function onStatusChanged() { toast.show(look.snapshots.status, look.snapshots); } }
+    Connections {
+        target: center
+        function onSaveAllRunningChanged() {
+            if (center.saveAllRunning) toast.show({ text: "Saving all…", level: "busy" }, center);
+        }
+        function onSaveAllMessageChanged() {
+            toast.show(center.saveAllMessage ? { text: "Save all: " + center.saveAllMessage,
+                                                 level: center.saveAllFailed ? "error" : "info" } : null, center);
+        }
+    }
+
     FloatingWindow {
         title: "Ajmashell Theme Center"
         implicitWidth: 1600
@@ -155,6 +186,9 @@ ShellRoot {
                 else if (e.key === Qt.Key_Backtab) center.select((center.current + center.tabs.length - 1) % center.tabs.length);
                 else if (e.key === Qt.Key_Tab) center.select((center.current + 1) % center.tabs.length);
                 else if (e.key >= Qt.Key_1 && e.key <= Qt.Key_9) center.selectNth(e.key - Qt.Key_1);
+                else if (e.key === Qt.Key_O) center.openSnapshot();
+                else if (e.key === Qt.Key_S && (e.modifiers & Qt.ShiftModifier)) center.saveSnapshot();
+                else if (e.key === Qt.Key_S) center.saveTab();
                 else return;
                 e.accepted = true;
             }
@@ -187,6 +221,13 @@ ShellRoot {
                     }
                 }
                 Component.onCompleted: open(center.current)
+            }
+
+            Toast {
+                id: toast
+                frame: center
+                anchors { top: bar.bottom; right: parent.right; margins: 8 }
+                z: 1
             }
 
             SaveAllDialog {
