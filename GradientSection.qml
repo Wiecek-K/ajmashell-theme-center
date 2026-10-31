@@ -2,7 +2,8 @@
 // Gradient section of the Look tab's builder (faza E ticket 14, ADR 0021): the gradient of the big popups' background,
 // one for every look (a preset keeps it). Style, colours A and B (roles of look-options.json, each a select that opens
 // its list), strength, angle and the reaches A and B. A new style sets the reaches to its defaults; a reach the style
-// does not use is greyed out, the select of colour B is hidden in a style without B (`uses` in look-options.json). Styles, ranges and the roles come from Ajmashell's look-options.json through the helper;
+// does not use is greyed out, the select of colour B is hidden in a style without B (`uses` in look-options.json), the
+// angle is greyed out in a style without a direction (`angle: false`). Styles conic … aurora: ticket E16 (prototype). Styles, ranges and the roles come from Ajmashell's look-options.json through the helper;
 // the drawing is Ajmashell's look/GradientFill.qml (LookMock.qml). A blue frame or mark = the current value.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -21,13 +22,23 @@ Column {
     readonly property var reaches: style ? style.reaches : ({})
     readonly property var uses: style ? style.uses : []
     readonly property var colours: app.palette.trialColors || app.palette.currentColors
-    readonly property var styleNames: ({ off: "none", linear: "linear", corner: "corner glow", bands: "bands", duo: "two-colour" })
+    readonly property var styleNames: ({
+        off: "none", linear: "linear", corner: "corner glow", bands: "bands", duo: "two-colour", conic: "conic",
+        mirror: "mirror", glow: "centre glow", spotlight: "spotlight", vignette: "vignette", stripes: "stripes", aurora: "aurora"
+    })
     // what the reaches mean in each style
     readonly property var reachHelp: ({
         linear: "Reach A: where colour A fades into the background.",
         corner: "Reach A: the glow of A from the corner, a share of the diagonal. Reach B above 0: a second glow of B from the opposite corner.",
         bands: "Reach A and B: how far each colour goes in from its own end; between them the plain background.",
-        duo: "Reach A: where A turns into B half way."
+        duo: "Reach A: where A turns into B half way.",
+        conic: "Colours turn around the centre from the angle. Reach A: where along the turn B is at its fullest; then back to A.",
+        mirror: "A at both ends, B in the middle. Reach A: how wide the middle of B is.",
+        glow: "A glows from the centre. Reach A: how far, a share of the way to a corner. No angle.",
+        spotlight: "A shines in from the edge, in the direction of the angle. Reach A: how far, a share of the diagonal.",
+        vignette: "A frames the edges, the middle stays plain. Reach A: how thick the frame is. No angle.",
+        stripes: "Stripes of A across the angle. Reach A: how wide one stripe and one gap are. Reach B: how soft their edges are.",
+        aurora: "Soft blobs of A and B around the centre; the angle turns them. Reach A: how big they are. In a look with motion they drift (the preview stands still)."
     })
 
     // one role: a select (the chosen role; a click opens the list under it)
@@ -170,7 +181,7 @@ Column {
     RoleSelect { label: "Colour B"; part: "b"; visible: s.uses.includes("b") } // only where the style draws B (user, 2026-10-30)
 
     PartSlider { label: "Strength"; part: "strength"; range: s.o ? s.o.strength : null; enabled: s.on }
-    PartSlider { label: "Angle"; part: "angle"; range: s.o ? s.o.angle : null; percent: false; enabled: s.on }
+    PartSlider { label: "Angle"; part: "angle"; range: s.o ? s.o.angle : null; percent: false; enabled: s.on && s.style.angle !== false }
     PartSlider { label: "Reach A"; part: "reachA"; range: s.o ? s.o.reach : null; enabled: "reachA" in s.reaches }
     PartSlider { label: "Reach B"; part: "reachB"; range: s.o ? s.o.reach : null; enabled: "reachB" in s.reaches }
     Text {
