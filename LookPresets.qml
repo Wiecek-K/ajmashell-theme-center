@@ -41,7 +41,7 @@ Column {
         }
     }
     Text {
-        text: "Trial: " + p.app.presetOf(p.t) + "   ·   current: " + p.app.presetOf(p.cur)
+        text: "Trial: " + p.app.nameOf(p.t) + "   ·   current: " + p.app.nameOf(p.cur)
         color: p.app.edited ? p.app.ui.trial : p.app.ui.dim
         font { family: p.app.ui.font; pixelSize: 12 }
     }

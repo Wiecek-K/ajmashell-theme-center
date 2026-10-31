@@ -3,7 +3,7 @@
 // every control is in the panel on the right, so the previews take the rest; user, 2026-10-30)
 // for the wallpaper selected in the Palette tab: current = the live look on the current palette recipe, trial = the
 // builder's look on the trial palette recipe (colours from PaletteState), each in LookMock.qml. Panel on the right:
-// presets and builder (LookPresets.qml), the gradient of the background under it (GradientSection.qml, ticket 14),
+// presets and builder (LookPresets.qml), saved looks (SavedSection.qml, ticket E18), the gradient of the background under it (GradientSection.qml, ticket 14),
 // "Save look", "Save all".
 // Only the view: the state is LookState.qml in the frame.
 pragma ComponentBehavior: Bound
@@ -75,6 +75,16 @@ Item {
                     visible: !!tab.app.options
                     width: col.width
                     app: tab.app
+                }
+
+                SavedSection {
+                    visible: !!tab.app.options
+                    width: col.width
+                    app: tab.app
+                    store: tab.app.savedStore
+                    trial: tab.app.trial
+                    active: tab.app.same(tab.app.trial, tab.app.savedStore.data)
+                    keys: tab
                 }
 
                 Rectangle { visible: !!tab.app.options; width: parent.width; height: 1; color: tab.app.ui.line }
@@ -149,9 +159,9 @@ Item {
                     Text {
                         width: parent.width
                         elide: Text.ElideRight
-                        text: (pv.trial ? "Trial" : "Current") + " · " + tab.app.presetOf(pv.look)
+                        text: (pv.trial ? "Trial" : "Current") + " · " + tab.app.nameOf(pv.look)
                               + (tab.pal.wallpaperName ? " · " + tab.pal.wallpaperName : "")
-                              + (pv.trial && tab.pal.trialDiffers ? " · palette: trial" : "")
+                              + (pv.trial && tab.pal.trialDiffers ? " · palette: " + (tab.pal.trialName || "trial") : "")
                               + (pv.look && pv.look.motion ? " · motion (still frame)" : "")
                               + (pv.colours ? "" : " · computing…")
                         color: pv.trial ? tab.app.ui.trial : tab.app.ui.accent

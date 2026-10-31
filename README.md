@@ -101,6 +101,13 @@ drops unsaved trial settings without asking.
   they mean depends on the style; a new style sets them to its defaults, a reach the style does not use and the angle
   of a style without a direction are greyed out). The styles and ranges come from `look-options.json` too. The previews draw the gradient
   with Ajmashell's own `look/GradientFill.qml`, loaded from the Ajmashell directory, so they match the popups.
+- **Saved** (in Look under the presets, in Palette under the controls of the trial recipe): type a name and click
+  "Save as" (or Enter) to keep the trial look or the trial recipe under that name; a click on a name loads it into the
+  trial, "×" deletes it. A name that exists already, and a delete, ask with a second click on the same button
+  ("overwrite?", "delete?"). Loading fills only the trial, like a preset: Ajmashell changes with "Save look" or "Save
+  palette". A loaded look is the whole look (background, alpha, effects, gradient). While the trial still equals what
+  was loaded or saved, the captions show its name instead of "custom", and its chip is filled. The two lists are apart:
+  loading a look leaves the palette recipe as it is, and the other way round.
 
 ## Saving: what changes in your system
 
@@ -124,6 +131,12 @@ never writes into the Ajmashell directory.
 `look_settings.save()`: validated, atomic). Ajmashell watches the file and changes its popups at once; the file is
 outside git, so trying a look leaves no trace in the dotfiles. Delete the file to go back to Ajmashell's defaults.
 New defaults or a new preset are a change in Ajmashell's `look-options.json`, never made by this tool.
+
+"Save as" writes one file per name next to the live files: `~/.local/state/ajmashell/saved/look/<name>.json` and
+`~/.local/state/ajmashell/saved/palette/<name>.json`, validated by the same modules (`look_settings.save()`,
+`palette_recipe.save()`). They are read the way the live files are: a field missing in an older file (one saved before
+a new gradient part, for example) takes the default, and a bad field shows a warning under the list. A name is one
+file name: at most 64 characters, no `/` or `\`, not starting with a dot. Outside git, like the live files.
 
 ## Settings: the paths it needs
 
@@ -170,10 +183,12 @@ on the desktop the result equals Ajmashell's `~/.local/state/ajmashell/colors.js
 | `Strip.qml`, `WallpaperView.qml`, `TokenTable.qml`, `SidePanel.qml` (with `Chip.qml`, `TrialSlider.qml`) | strip on the left, preview with the candidates and the token table in the middle, panel on the right |
 | `Previews.qml` (with `DesktopMock.qml`, `KittyMock.qml`) | desktop (Bar + control centre) and kitty mock-ups for the current and the trial recipe side by side; next to the table when the window is wide (table in two columns + at least 420 px), otherwise under the candidates |
 | `LookState.qml` | state of the Look tab: the current and the trial look, presets, "Save look" (through the helper of `PaletteState`) |
+| `SavedStore.qml`, `SavedSection.qml` | saved looks and recipes (one store per tab, the helper keeps the files): the names, "Save as", load, delete |
 | `LookTab.qml`, `LookPresets.qml`, `GradientSection.qml`, `LookMock.qml` | the Look tab: previews of both looks, the presets and the builder, the gradient section, the Orbita and control centre mock-up (gradient drawn by Ajmashell's `look/GradientFill.qml`) |
 | `Mockups.js` | the one place that maps tokens to parts of the mock-ups, with a note on where each comes from (roles of the Ajmashell `Theme.qml`; the look's background from the look; kitty and the border from the system's files) |
 | `SettingsTab.qml`, `SettingsState.qml` | the Settings tab: a field per path, its default, "found" / "missing" |
 | `helper/tuner.py` | the helper: real matugen, the recipe module, the look module and the colour categories from the Ajmashell install (imported by path, not copied), the matugen version check |
+| `helper/saved.py` | saved settings: the folder next to a live file, the name rules, the list |
 | `helper/settings.py` | the paths: defaults (the one place they are written), `settings.json`, found / missing |
 | `install.sh` | install and uninstall, see above |
 | `ajmashell-theme-center.desktop` | the launcher entry `install.sh` installs |
@@ -196,7 +211,9 @@ they stay Polish. Everything else in the window is English.
 - `tests/test_settings.py`: the settings: defaults, own paths, a broken file or value, atomic save, found / missing.
 - `tests/test_helper.py`: the helper's protocol, run as the window runs it: the palette recipe file named by the
   recipe module, two recipes in one request validated by the recipe module, the answers to `check` and `settings` (the
-  helper restarts in the same process), missing paths as messages, a save with its steps, the default recipe without the live file and `readRecipe`, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`.
+  helper restarts in the same process), missing paths as messages, a save with its steps, the default recipe without the live file and `readRecipe`, the matugen version warning, the look in `ready` (with its gradient and the path of `GradientFill.qml`) and `saveLook`; saved settings (`saveAs`, `loadSaved`, `deleteSaved`: a look and a
+  recipe under a name after a restart, overwrite only when asked, a bad look or name refused, the list without files
+  no name gives, an older file read leniently, a delete).
   Everything runs in a temporary directory with copies of the real `palette_recipe.py` and `look_settings.py` (from `$AJMASHELL_DIR` or
   `~/.config/quickshell/ajmashell`; the tests skip without it), stand-ins for `indexer.py` and `wpapply.sh`, and a
   stand-in `matugen` that only answers `--version`; no palette is computed. A helper that does not report its

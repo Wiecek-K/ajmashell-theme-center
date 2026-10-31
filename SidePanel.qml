@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Right panel (variant D of the prototype): controls of the trial recipe next to the current recipe (the system
 // file), "restore current", "Save palette" with the steps after it, folder progress for both recipes,
-// the summary of what the trial changes, the last copied hex. Lists and ranges of the controls come from the helper
+// the summary of what the trial changes, the last copied hex. Saved recipes under the controls (SavedSection.qml,
+// ticket E18). Lists and ranges of the controls come from the helper
 // (palette_recipe.options()), never copied here. On top: what each missing path stops (ticket 09; the paths are set in
 // the Settings tab). "Save palette" saves this tab, "Save all" every tab (ticket 12).
 pragma ComponentBehavior: Bound
@@ -12,6 +13,7 @@ Rectangle {
     id: p
     property var app
     property var frame
+    property Item keys     // the tab: gets the keys back after "Save as"
     color: app.ui.panel
 
     readonly property var r: app.recipe
@@ -98,11 +100,14 @@ Rectangle {
                 height: 24
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Trial recipe"
+                    width: parent.width - restoreTrial.width - 8
+                    elide: Text.ElideRight
+                    text: "Trial recipe" + (p.app.trialName ? " · " + p.app.trialName : "")
                     color: p.app.ui.trial
                     font { family: p.app.ui.font; pixelSize: 14; bold: true }
                 }
                 Chip {
+                    id: restoreTrial
                     anchors.right: parent.right
                     app: p.app
                     label: "restore current"
@@ -176,6 +181,15 @@ Rectangle {
                 text: "Blue frame and tick: value of the current recipe."
                 color: p.app.ui.dim
                 font { family: p.app.ui.font; pixelSize: 11 }
+            }
+
+            SavedSection {
+                width: parent.width
+                app: p.app
+                store: p.app.savedStore
+                trial: p.app.trial
+                active: !!p.app.trialName
+                keys: p.keys
             }
 
             // story 51-55: one button, no commit; the steps after the file run in the helper's background

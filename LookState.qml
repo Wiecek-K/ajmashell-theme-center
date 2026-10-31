@@ -6,7 +6,8 @@
 // it); trial = what the builder shows. Roles, ranges, presets and defaults come from Ajmashell's look-options.json
 // through the helper (look_settings.options()), never copied here. Saving writes only the live file; Ajmashell changes
 // at once. The live file is watched: a change made outside the tool (by hand, a delete) becomes the current look, and
-// the trial follows while it was not edited. Talks to the helper of PaletteState (send(), message). Not visible;
+// the trial follows while it was not edited. Saved looks (ticket E18, SavedStore.qml): a look kept under a name, a load
+// fills the builder like a preset. Talks to the helper of PaletteState (send(), message). Not visible;
 // LookTab.qml is the view.
 // Tab interface of the frame: edited, busy, save(), saving, saveError, effect.
 import QtQuick
@@ -47,6 +48,22 @@ Scope {
 
     function same(a, b) {
         return !!a && !!b && matches(a, b);
+    }
+
+    // saved looks (ticket E18): a load fills the whole builder, gradient included (user, 2026-10-31)
+    readonly property SavedStore savedStore: SavedStore {
+        kind: "look"
+        palette: app.palette
+        onLoaded: data => {
+            app.trial = app.copy(data);
+            app.saved = false;
+        }
+    }
+
+    // the name of a look in the captions: the saved look it was loaded from or saved as while it still equals it,
+    // else its preset or "custom"
+    function nameOf(look) {
+        return savedStore.name && same(look, savedStore.data) ? savedStore.name : presetOf(look);
     }
 
     // the preset a look equals, else "custom"

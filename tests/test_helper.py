@@ -347,6 +347,104 @@ class Helper(unittest.TestCase):
         self.send({"type": "readLook"})
         self.assertEqual(self.expect("lookRead")["current"], defaults)
 
+    # Saved settings (ticket E18): a look or a palette recipe under a name, next to the module's live file
+
+    def restart_helper(self):
+        """The window closed and opened again: a new helper, a new "ready"."""
+        self.proc.kill()
+        self.proc.wait()
+        self.proc.stdin.close()
+        self.proc.stdout.close()
+        return self.start()
+
+    def test_save_as_keeps_a_look_under_its_name_after_a_restart(self):
+        self.assertEqual(self.start()["saved"], {"look": [], "palette": []})
+        self.send({"type": "saveAs", "kind": "look", "name": "violet vignette", "data": STILL})
+        self.assertEqual(self.expect("savedAs"), {"type": "savedAs", "kind": "look", "name": "violet vignette",
+                                                  "data": STILL})
+        self.assertEqual(self.expect("savedList")["names"], ["violet vignette"])
+        with open(self.path("state/saved/look/violet vignette.json")) as f:
+            self.assertEqual(json.load(f), STILL)
+        with open(self.look_file) as f:
+            self.assertEqual(json.load(f), STILL)  # the live file is not touched
+        self.assertEqual(self.restart_helper()["saved"]["look"], ["violet vignette"])
+
+    def test_an_existing_name_is_overwritten_only_when_asked(self):
+        self.write(self.path("state/saved/look/mine.json"), STILL)
+        self.start()
+        other = dict(STILL, alpha=0.7)
+        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": other})
+        self.assertIn("exists", self.expect("savedAs")["error"])
+        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": other, "overwrite": True})
+        self.assertEqual(self.expect("savedAs")["data"], other)
+        with open(self.path("state/saved/look/mine.json")) as f:
+            self.assertEqual(json.load(f)["alpha"], 0.7)
+
+    def test_a_bad_look_is_not_saved_under_a_name(self):
+        self.start()
+        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": dict(STILL, alpha=0.2)})
+        self.assertIn("alpha", self.expect("savedAs")["error"])
+        self.assertFalse(os.path.exists(self.path("state/saved/look/mine.json")))
+
+    def test_a_name_that_is_no_file_name_is_refused(self):
+        self.start()
+        for name in ["", "   ", "../look", "a/b", ".hidden", "x" * 65, "tab\there"]:
+            self.send({"type": "saveAs", "kind": "look", "name": name, "data": STILL})
+            self.assertIn("error", self.expect("savedAs"), name)
+        self.assertFalse(os.path.exists(self.path("state/look.json.json")))
+        self.assertEqual(os.listdir(self.path("state")), ["look.json"])
+
+    def test_the_list_leaves_out_files_no_name_gives_and_sorts_without_case(self):
+        for f in ["b.json", "A.json", ".x.json", ".look.json.1a2b", "notes.txt"]:
+            self.write(self.path("state/saved/look/" + f), STILL)
+        self.assertEqual(self.start()["saved"]["look"], ["A", "b"])
+
+    def test_a_saved_look_loads_leniently_like_the_live_file(self):
+        defaults = self.start()["lookSettings"]["options"]["defaults"]
+        old = {k: v for k, v in STILL.items() if k not in ("gradient", "blur")}  # before tickets 14 and the blur flag
+        old["alpha"] = 3
+        self.write(self.path("state/saved/look/old.json"), old)
+        self.send({"type": "loadSaved", "kind": "look", "name": "old"})
+        loaded = self.expect("savedLoaded")
+        self.assertEqual(loaded["data"], dict(STILL, alpha=defaults["alpha"], blur=defaults["blur"],
+                                              gradient=defaults["gradient"]))
+        self.assertEqual(len(loaded["warnings"]), 1)
+        self.assertIn("alpha", loaded["warnings"][0])
+
+    def test_loading_a_missing_name_is_an_error(self):
+        self.start()
+        self.send({"type": "loadSaved", "kind": "look", "name": "gone"})
+        self.assertIn("gone", self.expect("savedLoaded")["error"])
+
+    def test_delete_removes_the_file_and_sends_the_list(self):
+        self.write(self.path("state/saved/look/a.json"), STILL)
+        self.write(self.path("state/saved/look/b.json"), STILL)
+        self.start()
+        self.send({"type": "deleteSaved", "kind": "look", "name": "a"})
+        self.assertEqual(self.expect("savedList"), {"type": "savedList", "kind": "look", "names": ["b"]})
+        self.send({"type": "deleteSaved", "kind": "look", "name": "a"})
+        self.assertIn("error", self.expect("savedList"))
+
+    def test_a_palette_recipe_is_saved_and_loaded_apart_from_the_look(self):
+        self.start()
+        self.send({"type": "saveAs", "kind": "palette", "name": "vibrant", "data": VIBRANT})
+        self.assertEqual(self.expect("savedAs")["data"], VIBRANT)
+        self.assertEqual(self.expect("savedList"), {"type": "savedList", "kind": "palette", "names": ["vibrant"]})
+        self.assertTrue(os.path.isfile(self.path("saved/palette/vibrant.json")))  # next to the live recipe file
+        # an older recipe without the dark lightness: the default recipe's value
+        self.write(self.path("saved/palette/old.json"), {"seed": {"rule": "darkness"}, "palette": {"scheme": "scheme-vibrant"}})
+        self.send({"type": "loadSaved", "kind": "palette", "name": "old"})
+        self.assertEqual(self.expect("savedLoaded")["data"],
+                         {"seed": {"rule": "darkness"},
+                          "palette": dict(NEUTRAL["palette"], scheme="scheme-vibrant")})
+        self.assertEqual(self.restart_helper()["saved"], {"look": [], "palette": ["old", "vibrant"]})
+
+    def test_without_the_look_module_saved_looks_are_off_not_a_crash(self):
+        os.remove(os.path.join(self.shell, "singletons", "look", "look_settings.py"))
+        self.assertEqual(self.start()["saved"], {"look": None, "palette": []})
+        self.send({"type": "saveAs", "kind": "look", "name": "mine", "data": STILL})
+        self.assertIn("look", self.expect("savedAs")["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

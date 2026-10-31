@@ -5,7 +5,8 @@
 // change restarts the helper, the window stays). Not visible; PaletteTab.qml is the view.
 // For the frame and the other tabs (read only): edited, busy, save(), saving, saveError, effect, saveFirst, and the colours
 // of both recipes for the selected wallpaper (currentColors, trialColors, wallpaperName). The Look tab (LookState) talks to the
-// same helper: send() and the signal message (every message of the helper).
+// same helper: send() and the signal message (every message of the helper). Saved palette recipes (ticket E18,
+// SavedStore.qml): a recipe kept under a name, a load fills the trial recipe.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -183,6 +184,29 @@ Scope {
         checked = null;
         settingsError = "";
         checkDebounce.stop();
+    }
+
+    // saved palette recipes (ticket E18): a load fills the trial, as the controls do; the system file stays
+    readonly property SavedStore savedStore: SavedStore {
+        kind: "palette"
+        palette: app
+        onLoaded: data => {
+            app.trial = JSON.parse(JSON.stringify(data));
+            app.trialAll = false;
+            debounce.stop();
+            app.request();
+        }
+    }
+
+    // the saved recipe the trial was loaded from or saved as, while the trial still equals it; else ""
+    readonly property string trialName: savedStore.name && sameRecipe(trial, savedStore.data) ? savedStore.name : ""
+
+    function sameRecipe(a, b) {
+        if (!a || !b) return false;
+        for (const section in b)
+            for (const key in b[section])
+                if (!a[section] || a[section][key] !== b[section][key]) return false;
+        return true;
     }
 
     function restore() {

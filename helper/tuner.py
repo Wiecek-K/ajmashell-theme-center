@@ -26,6 +26,11 @@
 #       the file and changes at once (ticket 13).
 #   {"type": "readLook"}   the live look file again: the window saw it change (a hand edit, a delete)
 #   {"type": "readRecipe"}   the palette recipe again: the window saw its live file change (a hand edit, a delete)
+#   {"type": "saveAs", "kind": "look" | "palette", "name": text, "data": {...}, "overwrite": bool}
+#       keep a look or a palette recipe under a name (ticket E18, saved.py): the module's strict save into
+#       <live file's folder>/saved/<kind>/<name>.json; an existing name only with "overwrite". The live file stays.
+#   {"type": "loadSaved", "kind", "name"}   read a saved setting the way the module reads its live file (lenient)
+#   {"type": "deleteSaved", "kind", "name"}
 #   {"type": "check", "paths": {key: text}}   status of paths typed in the Settings panel, nothing saved
 #   {"type": "settings", "paths": {key: text}}
 #       save the settings (settings.save: atomic, an empty path = the default), then the helper restarts itself in the
@@ -47,6 +52,11 @@
 #       (the Look tab, ticket 13: look_settings.options() and load() of <ajmashellDir>/singletons/look; null without
 #       the module, see "problems"; ticket 14: <ajmashellDir>/look/GradientFill.qml, which the previews load to draw
 #       the gradient, null without it)
+#    "saved": {"look": [name] | null, "palette": [name] | null}   (saved settings, ticket E18; null without the module)
+#   {"type": "savedAs", "kind", "name", "data": {...}} | {"type": "savedAs", "kind", "name", "error": text}
+#       (the validated setting, or why it was not saved; on success a "savedList" follows)
+#   {"type": "savedLoaded", "kind", "name", "data": {...}, "warnings": [text]} | {…, "error": text}
+#   {"type": "savedList", "kind", "names": [name]} | {…, "error": text}   (after a save and a delete)
 #   {"type": "checked", "settings": [...]}   (settings.status() of the paths of a "check")
 #   {"type": "settingsSaved", "error": text}   (settings not saved; on success a new "ready" comes instead)
 #   {"type": "accepted", "recipes": [{...}], "fingerprints": [fp]}   (validated, in the order of the request)
@@ -64,8 +74,10 @@
 # (default ~/.cache), so a second start is instant. At most half the cores, like the indexer (the CPU is this
 # machine's bottleneck).
 
+import contextlib
 import hashlib
 import importlib
+import io
 import json
 import os
 import re
@@ -76,6 +88,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.dont_write_bytecode = True  # no __pycache__ in the Ajmashell install
+import saved  # noqa: E402
 import settings  # noqa: E402
 
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
@@ -352,6 +365,63 @@ def save_look(look):
     send({"type": "lookSaved", "look": valid})
 
 
+def read_look(path):
+    """look_settings.load() of a saved look, its warnings (stderr in the module) as a list for the window."""
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        data = look_settings.load(path)
+    return data, [ln.removeprefix("look_settings: ") for ln in err.getvalue().splitlines() if ln]
+
+
+def read_recipe(path):
+    warnings = []
+    data = palette_recipe.load(path, warnings=warnings)
+    return data, [w.removeprefix("palette_recipe: ") for w in warnings]
+
+
+def saved_kinds():
+    """{kind: (strict save, lenient read, folder)} of the saved settings (ticket E18), for the modules in use."""
+    out = {}
+    if look_settings:
+        out["look"] = (look_settings.save, read_look, saved.folder(look_settings.DEFAULT_PATH, "look"))
+    if palette_recipe:
+        out["palette"] = (palette_recipe.save, read_recipe, saved.folder(palette_recipe.DEFAULT_PATH, "palette"))
+    return out
+
+
+def saved_names():
+    kinds = saved_kinds()
+    return {kind: saved.names(kinds[kind][2]) if kind in kinds else None for kind in ("look", "palette")}
+
+
+def saved_message(msg):
+    """saveAs, loadSaved, deleteSaved: the answer always comes, an error included."""
+    kind, name, kinds = msg.get("kind"), msg.get("name"), saved_kinds()
+    answer = {"saveAs": "savedAs", "loadSaved": "savedLoaded", "deleteSaved": "savedList"}[msg["type"]]
+    try:
+        if kind not in kinds:
+            raise ValueError(f"no {kind} module in the Ajmashell directory (see Settings)")
+        write, read, where = kinds[kind]
+        file = saved.path(where, name)
+        name = saved.check_name(name)
+        if msg["type"] != "saveAs" and not os.path.isfile(file):
+            raise ValueError(f"no saved {kind} {name!r}")
+        if msg["type"] == "saveAs":
+            if os.path.exists(file) and not msg.get("overwrite"):
+                raise ValueError(f"{name!r} exists already")
+            send({"type": answer, "kind": kind, "name": name, "data": write(msg.get("data"), file)})
+        elif msg["type"] == "loadSaved":
+            data, warnings = read(file)
+            send({"type": answer, "kind": kind, "name": name, "data": data, "warnings": warnings})
+            return
+        else:
+            saved.delete(where, name)
+    except Exception as e:  # noqa: BLE001  (any failure must reach the window, else it waits for the answer)
+        send({"type": answer, "kind": kind, "name": name, "error": str(e) or type(e).__name__})
+        return
+    send({"type": "savedList", "kind": kind, "names": saved.names(where)})
+
+
 def look_state():
     """The Look tab's part of "ready": options, the look in the live file (defaults without it), the file, and
     Ajmashell's gradient drawing that the previews load (ticket 14; None for an Ajmashell without it)."""
@@ -444,7 +514,7 @@ def main():
           "settings": status, "settingsFile": settings.default_file(), "settingsWarning": warning,
           "recipeFile": palette_recipe.DEFAULT_PATH if palette_recipe else None,
           "problems": problems, "matugenWarning": matugen_warning(),
-          "lookSettings": look_state() if look_settings else None})
+          "lookSettings": look_state() if look_settings else None, "saved": saved_names()})
     queue = Queue(items)
     pool = ThreadPoolExecutor(max_workers=WORKERS)
     for _ in range(WORKERS):
@@ -469,6 +539,8 @@ def main():
             send({"type": "lookRead", "current": look_settings.load()})
         elif msg.get("type") == "saveLook":
             save_look(msg.get("look"))  # one small file: at once, not behind a palette save
+        elif msg.get("type") in ("saveAs", "loadSaved", "deleteSaved"):
+            saved_message(msg)  # small files: at once, like saveLook
         elif msg.get("type") == "check":
             try:
                 send({"type": "checked", "settings": settings.status(settings.resolve(msg.get("paths") or {}))})
