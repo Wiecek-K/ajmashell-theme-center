@@ -5,7 +5,8 @@
 // does not use is greyed out, the select of colour B is hidden in a style without B (`uses` in look-options.json), the
 // angle is greyed out in a style without a direction (`angle: false`). Styles, ranges and the roles come from
 // Ajmashell's look-options.json through the helper; the drawing is Ajmashell's look/GradientFill.qml (LookMock.qml).
-// A blue frame or mark = the current value. Styles conic … aurora: ticket E16 (prototype; the user keeps some of them).
+// A blue frame or mark = the current value. The style chips in a row per group of look-options.json (none, along a
+// line, from a point); styles mirror, glow, conic, vignette and the groups: ticket E16 (user, 2026-10-31).
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
@@ -24,9 +25,12 @@ Column {
     readonly property var uses: style ? style.uses : []
     readonly property var colours: app.palette.trialColors || app.palette.currentColors
     readonly property var styleNames: ({
-        off: "none", linear: "linear", corner: "corner glow", bands: "bands", duo: "two-colour", conic: "conic",
-        mirror: "mirror", glow: "centre glow", spotlight: "spotlight", vignette: "vignette", stripes: "stripes", aurora: "aurora"
+        off: "none", linear: "linear", duo: "two-colour", bands: "bands", mirror: "mirror",
+        glow: "centre glow", corner: "corner glow", conic: "conic", vignette: "vignette"
     })
+    readonly property var groupNames: ({ none: "", line: "Line", circle: "Circle" })
+    // the groups in the order of their first style
+    readonly property var groups: o ? o.styles.map(st => st.group).filter((gr, i, all) => all.indexOf(gr) === i) : []
     // what the reaches mean in each style
     readonly property var reachHelp: ({
         linear: "Reach A: where colour A fades into the background.",
@@ -36,10 +40,7 @@ Column {
         conic: "Colours turn around the centre from the angle. Reach A: where along the turn B is at its fullest; then back to A.",
         mirror: "A at both ends, B in the middle. Reach A: how wide the middle of B is.",
         glow: "A glows from the centre. Reach A: how far, a share of the way to a corner. No angle.",
-        spotlight: "A shines in from the edge, in the direction of the angle. Reach A: how far, a share of the diagonal.",
-        vignette: "A frames the edges, the middle stays plain. Reach A: how thick the frame is. No angle.",
-        stripes: "Stripes of A across the angle. Reach A: how wide one stripe and one gap are. Reach B: how soft their edges are.",
-        aurora: "Soft blobs of A and B around the centre; the angle turns them. Reach A: how big they are. In a look with motion they drift (the preview stands still)."
+        vignette: "A frames the edges, the middle stays plain. Reach A: how thick the frame is. No angle."
     })
 
     // one role: a select (the chosen role; a click opens the list under it)
@@ -161,19 +162,35 @@ Column {
         color: s.app.ui.dim
         font { family: s.app.ui.font; pixelSize: 11 }
     }
-    Flow {
-        width: parent.width
-        spacing: 6
-        Repeater {
-            model: s.o ? s.o.styles.map(st => st.name) : [] // a list: the order of look-options.json
-            Chip {
-                id: sc
-                required property string modelData
-                app: s.app
-                label: s.styleNames[sc.modelData] || sc.modelData
-                selected: !!s.t && s.t.style === sc.modelData
-                border.color: sc.selected ? sc.tone : s.cur && s.cur.style === sc.modelData ? s.app.ui.accent : s.app.ui.line
-                onClicked: s.app.setGradient("style", sc.modelData)
+    Repeater {
+        model: s.groups
+        Row {
+            id: gr
+            required property string modelData
+            spacing: 8
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 64
+                text: s.groupNames[gr.modelData] ?? gr.modelData
+                color: s.app.ui.dim
+                font { family: s.app.ui.font; pixelSize: 11 }
+            }
+            Flow {
+                width: s.width - 72
+                spacing: 6
+                Repeater {
+                    // a list: the order of look-options.json
+                    model: s.o.styles.filter(st => st.group === gr.modelData).map(st => st.name)
+                    Chip {
+                        id: sc
+                        required property string modelData
+                        app: s.app
+                        label: s.styleNames[sc.modelData] || sc.modelData
+                        selected: !!s.t && s.t.style === sc.modelData
+                        border.color: sc.selected ? sc.tone : s.cur && s.cur.style === sc.modelData ? s.app.ui.accent : s.app.ui.line
+                        onClicked: s.app.setGradient("style", sc.modelData)
+                    }
+                }
             }
         }
     }

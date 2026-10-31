@@ -94,12 +94,11 @@ drops unsaved trial settings without asking.
   above the other, for the wallpaper selected in Palette: the current look on the current palette recipe and the trial look on
   the trial palette recipe, each with the Orbita and the control centre on a blurred piece of the wallpaper (a still
   frame: "motion" in the caption when the look moves).
-- Under the builder, the **gradient** of the popups' background (one for every look: a preset keeps it): style (none,
-  linear, corner glow, bands, two-colour; prototype of ticket E16: conic, mirror, centre glow, spotlight, vignette,
-  stripes, aurora), colours A and B (each a select of the same roles), strength, angle and the reaches A and B (what
+- Under the builder, the **gradient** of the popups' background (one for every look: a preset keeps it): style (none; along a
+  line: linear, two-colour, bands, mirror; from a point: centre glow, corner glow, conic, vignette — a row per group),
+  colours A and B (each a select of the same roles), strength, angle and the reaches A and B (what
   they mean depends on the style; a new style sets them to its defaults, a reach the style does not use and the angle
-  of a style without a direction are greyed out). The aurora drifts in the popups of a look with motion; the previews
-  draw it standing. The styles and ranges come from `look-options.json` too. The previews draw the gradient
+  of a style without a direction are greyed out). The styles and ranges come from `look-options.json` too. The previews draw the gradient
   with Ajmashell's own `look/GradientFill.qml`, loaded from the Ajmashell directory, so they match the popups.
 
 ## Saving: what changes in your system
